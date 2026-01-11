@@ -4,6 +4,7 @@ Views for the detection app
 
 import time
 import os
+import tempfile
 from django.utils import timezone
 from rest_framework import viewsets, status
 from rest_framework.decorators import action
@@ -25,14 +26,14 @@ class DetectionEventViewSet(viewsets.ModelViewSet):
     queryset = DetectionEvent.objects.all()
     serializer_class = DetectionEventSerializer
     
-    @action(detail=['GET'], methods=['get'])
+    @action(detail=False, methods=['get'])
     def pending(self, request):
         """Get all pending detection events"""
         pending_events = self.queryset.filter(status='pending')
         serializer = self.get_serializer(pending_events, many=True)
         return Response(serializer.data)
     
-    @action(detail=['GET'], methods=['get'])
+    @action(detail=False, methods=['get'])
     def confirmed(self, request):
         """Get all confirmed violence events"""
         confirmed_events = self.queryset.filter(status='confirmed')
@@ -58,7 +59,7 @@ class MonitoringCameraViewSet(viewsets.ModelViewSet):
     queryset = MonitoringCamera.objects.all()
     serializer_class = MonitoringCameraSerializer
     
-    @action(detail=['GET'], methods=['get'])
+    @action(detail=False, methods=['get'])
     def active(self, request):
         """Get all active cameras"""
         active_cameras = self.queryset.filter(is_active=True)
@@ -171,13 +172,15 @@ class VideoDetectionView(APIView):
         sample_rate = serializer.validated_data.get('sample_rate', 30)
         
         start_time = time.time()
+        temp_file = None
         
         try:
-            # Save video temporarily for processing
-            temp_path = f'/tmp/video_{int(time.time())}.mp4'
-            with open(temp_path, 'wb+') as destination:
-                for chunk in video.chunks():
-                    destination.write(chunk)
+            # Save video temporarily for processing using secure temporary file
+            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.mp4')
+            for chunk in video.chunks():
+                temp_file.write(chunk)
+            temp_file.close()
+            temp_path = temp_file.name
             
             # Detect violence using AI
             result = detector.detect_violence_in_video(temp_path, sample_rate=sample_rate)
@@ -205,7 +208,7 @@ class VideoDetectionView(APIView):
             )
             
             # Clean up temporary file
-            if os.path.exists(temp_path):
+            if temp_file and os.path.exists(temp_path):
                 os.remove(temp_path)
             
             response_data = {
@@ -225,7 +228,7 @@ class VideoDetectionView(APIView):
             
         except Exception as e:
             # Clean up temporary file on error
-            if 'temp_path' in locals() and os.path.exists(temp_path):
+            if temp_file and 'temp_path' in locals() and os.path.exists(temp_path):
                 os.remove(temp_path)
             
             # Log the error
