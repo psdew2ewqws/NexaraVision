@@ -573,7 +573,19 @@ export default function LivePage() {
               buffer_size: data.buffer,
             });
 
-            if (data.skeletons && data.skeletons.length > 0) {
+            // Handle skeleton display - same logic as WebSocket handler
+            if (data.processed_frame) {
+              // Server sent processed frame with skeleton - display it
+              displayProcessedFrame(data.processed_frame);
+              // Clear overlay canvas since skeleton is in processed frame
+              const overlay = overlayCanvasRef.current;
+              if (overlay) {
+                const ctx = overlay.getContext('2d');
+                if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+              }
+            } else if (data.skeletons && data.skeletons.length > 0) {
+              // Fallback: draw skeletons client-side (only if no processed_frame)
+              clearProcessedFrame();
               drawServerSkeletons(data.skeletons);
             }
           }
