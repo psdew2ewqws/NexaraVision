@@ -613,7 +613,7 @@ export default function LivePage() {
   // Connect WebSocket for server mode - returns Promise that resolves when connected
   const connectWebSocket = (): Promise<boolean> => {
     return new Promise((resolve) => {
-      const wsUrl = process.env.NEXT_PUBLIC_VASTAI_WS_URL || 'wss://79.160.189.79:14033/ws';
+      const wsUrl = process.env.NEXT_PUBLIC_VASTAI_WS_URL || 'wss://api.nexaravision.com:14033/ws/live';
       console.log('[WS] Connecting to:', wsUrl);
 
       try {
