@@ -1968,17 +1968,23 @@ export default function LivePage() {
                 onDragLeave={() => setIsDragging(false)}
                 onDrop={handleDrop}
               >
-                {/* Video */}
-                <video ref={videoRef} className="w-full h-full object-contain" muted={isMuted} playsInline />
+                {/* Video - Real view (not mirrored) for webcam */}
+                <video
+                  ref={videoRef}
+                  className="w-full h-full object-contain"
+                  style={{ transform: sourceType === 'webcam' ? 'scaleX(-1)' : 'none' }}
+                  muted={isMuted}
+                  playsInline
+                />
 
-                {/* Canvas for frame capture */}
+                {/* Canvas for frame capture (hidden) */}
                 <canvas ref={canvasRef} className="hidden" />
 
-                {/* Overlay for pose drawing */}
-                <canvas ref={overlayCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
+                {/* Overlay for client-side pose drawing */}
+                <canvas ref={overlayCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ transform: sourceType === 'webcam' ? 'scaleX(-1)' : 'none' }} />
 
-                {/* Processed frame canvas (server-rendered skeleton for perfect sync) */}
-                <canvas ref={processedFrameCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
+                {/* Server-rendered frame with skeleton (zero-delay, perfectly synced) */}
+                <canvas ref={processedFrameCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ transform: sourceType === 'webcam' ? 'scaleX(-1)' : 'none' }} />
 
                 {/* Violence Indicator Overlay */}
                 <AnimatePresence>
