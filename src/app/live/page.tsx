@@ -534,53 +534,82 @@ export default function LivePage() {
           try {
             const data = JSON.parse(event.data);
 
-            // Handle config_updated confirmation
+            // Handle config_updated confirmation (legacy v39)
             if (data.type === 'config_updated') {
-              console.log('[v39] Config updated on server:', data.config);
+              console.log('[WS] Config updated on server:', data.config);
               return;
             }
 
-            // Skip non-result messages (v39 sends type: 'result')
-            if (data.type !== 'result') {
-              console.log('[v39] Non-result message:', data.type);
-              return;
-            }
+            // Handle smart_veto_final format (no type field, has 'result' field)
+            if (data.result !== undefined && data.primary !== undefined) {
+              // Smart Veto Final format: {primary, veto, result, buffer, inference_ms, stats}
+              console.log('[SmartVeto]', {
+                primary: data.primary,
+                veto: data.veto,
+                result: data.result,
+                inference_ms: data.inference_ms,
+                buffer: data.buffer,
+              });
 
-            // Debug: log responses including VETO status
-            console.log('[v39 Response]', {
-              violence_score: data.violence_score,
-              t_total: data.t_total,
-              buffer_size: data.buffer_size,
-              num_detected: data.num_detected,
-              veto_src: data.extra?.src,
-              veto_score: data.extra?.v_veto,
-            });
-
-            // Update VETO status
-            if (data.extra?.src) {
-              setVetoStatus(data.extra.src as VetoStatus);
-              setVetoScore(data.extra.v_veto ?? null);
-            } else {
-              setVetoStatus('none');
-              setVetoScore(null);
-            }
-
-            // Process detection result
-            processDetectionResult(data);
-
-            // Draw YOLO v26 skeletons from v39 response
-            const skeletons = data.all_skeletons || data.skeletons || [];
-            console.log('[Skeleton] Received skeletons:', skeletons.length, 'First:', skeletons[0]?.slice?.(0, 3));
-            if (skeletons.length > 0) {
-              drawServerSkeletons(skeletons);
-            } else {
-              // Clear overlay if no skeletons
-              const overlay = overlayCanvasRef.current;
-              if (overlay) {
-                const ctx = overlay.getContext('2d');
-                if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+              // Update VETO status based on result
+              if (data.result === 'VIOLENCE') {
+                setVetoStatus('PRIMARY');
+                setVetoScore(data.veto / 100); // Convert percentage to 0-1
+              } else if (data.result === 'VETOED') {
+                setVetoStatus('VETO_OVERRIDE');
+                setVetoScore(data.veto / 100);
+              } else {
+                setVetoStatus('PRIMARY_FAST');
+                setVetoScore(null);
               }
+
+              // Convert smart_veto format to v39-compatible format for processDetectionResult
+              processDetectionResult({
+                violence_score: data.primary / 100, // Convert 0-100 to 0-1
+                t_total: data.inference_ms,
+                buffer_size: data.buffer,
+              });
+              return;
             }
+
+            // Handle legacy v39 format (has type: 'result')
+            if (data.type === 'result') {
+              console.log('[v39 Response]', {
+                violence_score: data.violence_score,
+                t_total: data.t_total,
+                buffer_size: data.buffer_size,
+                num_detected: data.num_detected,
+              });
+
+              // Update VETO status from v39 extra field
+              if (data.extra?.src) {
+                setVetoStatus(data.extra.src as VetoStatus);
+                setVetoScore(data.extra.v_veto ?? null);
+              } else {
+                setVetoStatus('none');
+                setVetoScore(null);
+              }
+
+              // Process detection result
+              processDetectionResult(data);
+
+              // Draw YOLO v26 skeletons from v39 response
+              const skeletons = data.all_skeletons || data.skeletons || [];
+              if (skeletons.length > 0) {
+                drawServerSkeletons(skeletons);
+              } else {
+                // Clear overlay if no skeletons
+                const overlay = overlayCanvasRef.current;
+                if (overlay) {
+                  const ctx = overlay.getContext('2d');
+                  if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+                }
+              }
+              return;
+            }
+
+            // Unknown message format
+            console.log('[WS] Unknown message format:', Object.keys(data));
           } catch (err) {
             console.error('WS message error:', err, event.data?.substring?.(0, 100));
           }
@@ -1943,7 +1972,7 @@ export default function LivePage() {
                       {detectionMode === 'server' ? 'Smart Veto Ensemble' : 'MoveNet Lightning'}
                     </div>
                     <div className="text-xs text-slate-500">
-                      {detectionMode === 'server' ? 'MSG3D 95.2% + STGCNPP 94.6%' : 'TensorFlow.js WebGL'}
+                      {detectionMode === 'server' ? 'STGCNPP 94% + MSG3D 85%' : 'TensorFlow.js WebGL'}
                     </div>
                   </div>
                 </div>
