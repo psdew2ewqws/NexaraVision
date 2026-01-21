@@ -280,6 +280,9 @@ export default function LivePage() {
   const [vetoStatus, setVetoStatus] = useState<VetoStatus>('none');
   const [vetoScore, setVetoScore] = useState<number | null>(null);
 
+  // Track if server is sending processed frames (to hide raw video and show server-rendered frame)
+  const [showProcessedFrame, setShowProcessedFrame] = useState(false);
+
   // Detection settings from Supabase (per-user) with localStorage fallback
   const { settings: detectionSettings, isLoading: settingsLoading, isAuthenticated: settingsAuthenticated } = useDetectionSettings();
 
@@ -1166,17 +1169,21 @@ export default function LivePage() {
 
       // Draw the processed frame (which has skeleton already drawn by server)
       ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+
+      // Hide raw video, show processed frame (prevents double image)
+      setShowProcessedFrame(true);
     };
     img.src = `data:image/jpeg;base64,${base64Data}`;
   };
 
-  // Clear the processed frame canvas
+  // Clear the processed frame canvas and show raw video again
   const clearProcessedFrame = () => {
     const canvas = processedFrameCanvasRef.current;
     if (canvas) {
       const ctx = canvas.getContext('2d');
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
+    setShowProcessedFrame(false);  // Show raw video again
   };
 
   // Draw YOLO v26 skeletons from server response (COCO 17-keypoint format)
@@ -1969,10 +1976,14 @@ export default function LivePage() {
                 onDrop={handleDrop}
               >
                 {/* Video - Real view (not mirrored) for webcam */}
+                {/* Hidden when server sends processed frames to prevent double image */}
                 <video
                   ref={videoRef}
                   className="w-full h-full object-contain"
-                  style={{ transform: sourceType === 'webcam' ? 'scaleX(-1)' : 'none' }}
+                  style={{
+                    transform: sourceType === 'webcam' ? 'scaleX(-1)' : 'none',
+                    opacity: showProcessedFrame ? 0 : 1  // Hide when server-rendered frame is active
+                  }}
                   muted={isMuted}
                   playsInline
                 />
