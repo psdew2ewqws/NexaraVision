@@ -19,6 +19,8 @@ const DEFAULT_ALERT_SETTINGS: Omit<AlertSettings, 'id' | 'user_id' | 'created_at
   min_confidence: 0.7,
   quiet_hours_start: null,
   quiet_hours_end: null,
+  alert_cooldown_seconds: 60,
+  last_alert_sent_at: null,
 };
 
 export function useAlertSettings(userId: string | undefined) {

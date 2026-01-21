@@ -1397,6 +1397,7 @@ export async function sendWhatsAppAlerts(alertData: IncidentAlertData): Promise<
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             phone: settings.whatsapp_number,
+            userId: settings.user_id,
             incidentId: alertData.incidentId,
             cameraName: alertData.cameraName,
             locationName: alertData.locationName,
@@ -1406,6 +1407,12 @@ export async function sendWhatsAppAlerts(alertData: IncidentAlertData): Promise<
         });
 
         const result = await response.json();
+
+        // Handle cooldown response - don't log as failure
+        if (result.cooldownActive) {
+          console.log(`[WhatsApp] ⏰ Cooldown active for ${settings.whatsapp_number}, ${result.remainingSeconds}s remaining`);
+          return; // Skip logging to database for cooldown
+        }
 
         // Log alert to database
         await supabase.from('alerts').insert({

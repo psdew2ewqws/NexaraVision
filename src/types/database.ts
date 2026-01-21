@@ -105,9 +105,13 @@ export interface AlertSettings {
   min_confidence: number;
   quiet_hours_start: string | null;
   quiet_hours_end: string | null;
+  alert_cooldown_seconds: number;
+  last_alert_sent_at: string | null;
   created_at: string;
   updated_at: string;
 }
+
+export type AlertCooldownOption = 30 | 60 | 300 | 600;
 
 export interface EscalationRule {
   id: string;

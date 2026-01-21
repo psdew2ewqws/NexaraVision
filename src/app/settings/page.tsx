@@ -162,6 +162,14 @@ const translations = {
       saved: 'Number saved',
       minConfidence: 'Minimum Confidence',
       minConfidenceDesc: 'Only alert when confidence exceeds this threshold',
+      cooldown: 'Alert Cooldown',
+      cooldownDesc: 'Minimum time between WhatsApp alerts',
+      cooldownOptions: {
+        '30': '30 seconds',
+        '60': '1 minute',
+        '300': '5 minutes',
+        '600': '10 minutes',
+      },
     },
     summary: 'Configuration Summary',
     violenceCutoff: 'Violence Cutoff',
@@ -231,6 +239,14 @@ const translations = {
       saved: 'تم حفظ الرقم',
       minConfidence: 'الحد الأدنى للثقة',
       minConfidenceDesc: 'التنبيه فقط عندما تتجاوز الثقة هذا الحد',
+      cooldown: 'فترة الانتظار بين التنبيهات',
+      cooldownDesc: 'الحد الأدنى للوقت بين تنبيهات واتساب',
+      cooldownOptions: {
+        '30': '30 ثانية',
+        '60': 'دقيقة واحدة',
+        '300': '5 دقائق',
+        '600': '10 دقائق',
+      },
     },
     summary: 'ملخص التكوين',
     violenceCutoff: 'حد العنف',
@@ -338,6 +354,16 @@ export default function SettingsPage() {
     }
     const result = await updateAlertSettings({ min_confidence: value / 100 });
     console.log('[Settings] Min confidence update result:', result);
+  };
+
+  const handleCooldownChange = async (value: number) => {
+    console.log('[Settings] Cooldown changed to:', value);
+    if (!user) {
+      console.log('[Settings] No user, cannot update cooldown');
+      return;
+    }
+    const result = await updateAlertSettings({ alert_cooldown_seconds: value });
+    console.log('[Settings] Cooldown update result:', result);
   };
 
   const handleSave = async () => {
@@ -676,6 +702,34 @@ export default function SettingsPage() {
                 { value: 95, label: '95%' },
               ]}
             />
+
+            <div className="h-px bg-zinc-800" />
+
+            {/* Alert Cooldown Selector */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-white">
+                {t.whatsapp.cooldown}
+              </label>
+              <p className="text-xs text-zinc-500">{t.whatsapp.cooldownDesc}</p>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[30, 60, 300, 600].map((seconds) => (
+                  <button
+                    key={seconds}
+                    onClick={() => handleCooldownChange(seconds)}
+                    disabled={!user}
+                    className={cn(
+                      "px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                      (alertSettings?.alert_cooldown_seconds || 60) === seconds
+                        ? "bg-emerald-600 text-white ring-2 ring-emerald-500/50"
+                        : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white",
+                      "disabled:opacity-50 disabled:cursor-not-allowed"
+                    )}
+                  >
+                    {t.whatsapp.cooldownOptions[seconds.toString() as keyof typeof t.whatsapp.cooldownOptions]}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </SettingsSection>
 
