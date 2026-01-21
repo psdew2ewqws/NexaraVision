@@ -1179,7 +1179,8 @@ export default function LivePage() {
     }
   };
 
-  // Draw YOLO v26 skeletons from v39 server response (COCO 17-keypoint format)
+  // Draw YOLO v26 skeletons from server response (COCO 17-keypoint format)
+  // CRITICAL: Server coordinates are in SENT FRAME SIZE (max 640x480), not video native size!
   const drawServerSkeletons = (skeletons: number[][][]) => {
     const overlay = overlayCanvasRef.current;
     const video = videoRef.current;
@@ -1191,13 +1192,26 @@ export default function LivePage() {
     const ctx = overlay.getContext('2d');
     if (!ctx) return;
 
-    // Use video native dimensions for coordinate scaling
-    const nativeWidth = video.videoWidth || 640;
-    const nativeHeight = video.videoHeight || 480;
+    // IMPORTANT: Server coordinates are in the SENT frame size (max 640x480)
+    // NOT in video.videoWidth/videoHeight!
+    const SENT_MAX_WIDTH = 640;
+    const SENT_MAX_HEIGHT = 480;
+
+    // Calculate the actual sent frame dimensions (same logic as frame capture)
+    const videoNativeWidth = video.videoWidth || 640;
+    const videoNativeHeight = video.videoHeight || 480;
+    let sentWidth = videoNativeWidth;
+    let sentHeight = videoNativeHeight;
+
+    if (sentWidth > SENT_MAX_WIDTH || sentHeight > SENT_MAX_HEIGHT) {
+      const scale = Math.min(SENT_MAX_WIDTH / sentWidth, SENT_MAX_HEIGHT / sentHeight);
+      sentWidth = Math.round(sentWidth * scale);
+      sentHeight = Math.round(sentHeight * scale);
+    }
 
     // Set canvas to match video display size
-    const displayWidth = video.clientWidth || nativeWidth;
-    const displayHeight = video.clientHeight || nativeHeight;
+    const displayWidth = video.clientWidth || videoNativeWidth;
+    const displayHeight = video.clientHeight || videoNativeHeight;
     overlay.width = displayWidth;
     overlay.height = displayHeight;
     ctx.clearRect(0, 0, displayWidth, displayHeight);
@@ -1212,28 +1226,19 @@ export default function LivePage() {
 
     const colors = ['#00ff00', '#ff6600', '#00ffff', '#ff00ff', '#ffff00'];
 
-    console.log(`[Skeleton] Drawing ${skeletons.length} skeletons, native: ${nativeWidth}x${nativeHeight}, display: ${displayWidth}x${displayHeight}`);
+    // Scale from SENT frame coordinates to DISPLAY coordinates
+    const scaleX = displayWidth / sentWidth;
+    const scaleY = displayHeight / sentHeight;
+
+    console.log(`[Skeleton] sent: ${sentWidth}x${sentHeight}, display: ${displayWidth}x${displayHeight}, scale: ${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`);
 
     skeletons.forEach((skeleton, poseIndex) => {
       if (!skeleton || skeleton.length < 17) {
-        console.warn(`[Skeleton] Invalid skeleton at index ${poseIndex}:`, skeleton?.length);
         return;
       }
 
       const color = colors[poseIndex % colors.length];
       const isViolent = currentViolence > 50;
-
-      // Check if coordinates are normalized (0-1) or pixel values
-      // v39 sends normalized coordinates (0-1)
-      const firstKp = skeleton[0];
-      const maxCoord = Math.max(firstKp?.[0] || 0, firstKp?.[1] || 0);
-      const isNormalized = maxCoord <= 1.0 && maxCoord > 0;
-
-      // Scale from normalized/pixel coords to display coords
-      const scaleX = isNormalized ? displayWidth : displayWidth / nativeWidth;
-      const scaleY = isNormalized ? displayHeight : displayHeight / nativeHeight;
-
-      console.log(`[Skeleton ${poseIndex}] normalized=${isNormalized}, scaleX=${scaleX.toFixed(1)}, scaleY=${scaleY.toFixed(1)}, firstKp=`, firstKp);
 
       // Draw connections
       ctx.strokeStyle = isViolent ? '#ef4444' : color;
