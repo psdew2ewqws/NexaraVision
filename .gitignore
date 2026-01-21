@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build
+.next/
+out/
+
+# Env
+.env
+.env.local
+.env.production.local
+
+# Debug
+npm-debug.log*
+
+# Vercel
+.vercel
+
+# Videos
+public/videos/

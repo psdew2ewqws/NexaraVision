@@ -1,0 +1,535 @@
+'use client';
+
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useLanguage } from '@/i18n/LanguageContext';
+import { cn } from '@/lib/utils';
+import { useDetectionSettings, DEFAULT_DETECTION_SETTINGS } from '@/hooks/useDetectionSettings';
+import {
+  SettingsSection,
+  SliderSetting,
+  NumberSetting,
+  ToggleSetting,
+  SummaryBox,
+} from '@/components/ui/toolbar-expandable';
+import {
+  FloatingPanelRoot,
+  FloatingPanelTrigger,
+  FloatingPanelContent,
+  FloatingPanelHeader,
+  FloatingPanelBody,
+  FloatingPanelFooter,
+  FloatingPanelCloseButton,
+} from '@/components/ui/floating-panel';
+
+// Re-export for backward compatibility
+export { DEFAULT_DETECTION_SETTINGS };
+export type DetectionSettings = typeof DEFAULT_DETECTION_SETTINGS;
+
+// Icons as minimal SVG components
+const Icons = {
+  brain: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+    </svg>
+  ),
+  bell: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
+    </svg>
+  ),
+  shield: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+    </svg>
+  ),
+  globe: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 21a9.004 9.004 0 008.716-6.747M12 21a9.004 9.004 0 01-8.716-6.747M12 21c2.485 0 4.5-4.03 4.5-9S14.485 3 12 3m0 18c-2.485 0-4.5-4.03-4.5-9S9.515 3 12 3m0 0a8.997 8.997 0 017.843 4.582M12 3a8.997 8.997 0 00-7.843 4.582m15.686 0A11.953 11.953 0 0112 10.5c-2.998 0-5.74-1.1-7.843-2.918m15.686 0A8.959 8.959 0 0121 12c0 .778-.099 1.533-.284 2.253m0 0A17.919 17.919 0 0112 16.5c-3.162 0-6.133-.815-8.716-2.247m0 0A9.015 9.015 0 013 12c0-1.605.42-3.113 1.157-4.418" />
+    </svg>
+  ),
+  zap: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+    </svg>
+  ),
+  clock: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+    </svg>
+  ),
+  video: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
+    </svg>
+  ),
+  volume: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19.114 5.636a9 9 0 010 12.728M16.463 8.288a5.25 5.25 0 010 7.424M6.75 8.25l4.72-4.72a.75.75 0 011.28.53v15.88a.75.75 0 01-1.28.53l-4.72-4.72H4.51c-.88 0-1.704-.507-1.938-1.354A9.01 9.01 0 012.25 12c0-.83.112-1.633.322-2.396C2.806 8.756 3.63 8.25 4.51 8.25H6.75z" />
+    </svg>
+  ),
+  check: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+    </svg>
+  ),
+  loader: (
+    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+    </svg>
+  ),
+  user: (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+    </svg>
+  ),
+  cloud: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z" />
+    </svg>
+  ),
+  info: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
+    </svg>
+  ),
+};
+
+const translations = {
+  en: {
+    title: 'Settings',
+    subtitle: 'Configure detection thresholds and preferences',
+    detection: {
+      title: 'Smart Veto Detection',
+      description: 'AI-powered violence detection with intelligent override system',
+      primary: 'Violence Detection Cutoff',
+      primaryDesc: 'Primary model threshold for violence classification',
+      veto: 'VETO Override Threshold',
+      vetoDesc: 'If VETO score is below this, override to SAFE',
+    },
+    alerts: {
+      title: 'Fight Alert Triggers',
+      description: 'Configure when alerts are triggered',
+      instant: 'Instant Fight Alert',
+      instantDesc: 'Trigger immediately on high confidence',
+      sustained: 'Sustained Fight Alert',
+      sustainedDesc: 'Trigger after continuous detection',
+      threshold: 'Threshold',
+      count: 'Frame Count',
+      duration: 'Duration',
+      frames: 'frames',
+      seconds: 'sec',
+    },
+    preferences: {
+      title: 'Preferences',
+      description: 'Sound, recording, and notification settings',
+      sound: 'Alert Sound',
+      soundDesc: 'Play sound when fight is detected',
+      autoRecord: 'Auto Record',
+      autoRecordDesc: 'Automatically record when violence detected',
+    },
+    language: {
+      title: 'Language & Region',
+      description: 'Change interface language',
+      current: 'Current',
+    },
+    summary: 'Configuration Summary',
+    violenceCutoff: 'Violence Cutoff',
+    vetoOverride: 'VETO Override',
+    instantAlert: 'Instant Alert',
+    sustainedAlert: 'Sustained Alert',
+    saveChanges: 'Save Changes',
+    saved: 'Saved',
+    saving: 'Saving...',
+    resetDefaults: 'Reset',
+    cloudSync: 'Synced to cloud',
+    localOnly: 'Stored locally',
+    signInToSync: 'Sign in to sync settings across devices',
+    helpTitle: 'Detection Settings Help',
+    helpContent: 'These settings control how the Smart Veto Ensemble detects violence. The primary threshold determines when the main model flags content as violent. The VETO threshold allows a secondary model to override false positives.',
+  },
+  ar: {
+    title: 'الإعدادات',
+    subtitle: 'تكوين حدود الكشف والتفضيلات',
+    detection: {
+      title: 'كشف الفيتو الذكي',
+      description: 'كشف العنف بالذكاء الاصطناعي مع نظام تجاوز ذكي',
+      primary: 'حد كشف العنف',
+      primaryDesc: 'حد النموذج الأساسي لتصنيف العنف',
+      veto: 'حد تجاوز الفيتو',
+      vetoDesc: 'إذا كانت درجة الفيتو أقل من هذا، تجاوز إلى آمن',
+    },
+    alerts: {
+      title: 'محفزات تنبيه القتال',
+      description: 'تكوين متى يتم تفعيل التنبيهات',
+      instant: 'تنبيه قتال فوري',
+      instantDesc: 'تفعيل فوري عند ثقة عالية',
+      sustained: 'تنبيه قتال مستمر',
+      sustainedDesc: 'تفعيل بعد كشف مستمر',
+      threshold: 'الحد',
+      count: 'عدد الإطارات',
+      duration: 'المدة',
+      frames: 'إطارات',
+      seconds: 'ثانية',
+    },
+    preferences: {
+      title: 'التفضيلات',
+      description: 'إعدادات الصوت والتسجيل والإشعارات',
+      sound: 'صوت التنبيه',
+      soundDesc: 'تشغيل الصوت عند اكتشاف قتال',
+      autoRecord: 'تسجيل تلقائي',
+      autoRecordDesc: 'تسجيل تلقائي عند اكتشاف العنف',
+    },
+    language: {
+      title: 'اللغة والمنطقة',
+      description: 'تغيير لغة الواجهة',
+      current: 'الحالية',
+    },
+    summary: 'ملخص التكوين',
+    violenceCutoff: 'حد العنف',
+    vetoOverride: 'تجاوز الفيتو',
+    instantAlert: 'تنبيه فوري',
+    sustainedAlert: 'تنبيه مستمر',
+    saveChanges: 'حفظ التغييرات',
+    saved: 'تم الحفظ',
+    saving: 'جاري الحفظ...',
+    resetDefaults: 'إعادة تعيين',
+    cloudSync: 'متزامن مع السحابة',
+    localOnly: 'مخزن محليًا',
+    signInToSync: 'سجل دخول لمزامنة الإعدادات',
+    helpTitle: 'مساعدة إعدادات الكشف',
+    helpContent: 'تتحكم هذه الإعدادات في كيفية كشف مجموعة الفيتو الذكية عن العنف.',
+  },
+};
+
+export default function SettingsPage() {
+  const { locale, isRTL, setLocale } = useLanguage();
+  const t = translations[locale as 'en' | 'ar'] || translations.en;
+  const [saved, setSaved] = useState(false);
+
+  const {
+    settings,
+    isLoading,
+    isSaving,
+    updateSetting,
+    saveSettings,
+    resetToDefaults,
+    isAuthenticated,
+  } = useDetectionSettings();
+
+  const handleSave = async () => {
+    const success = await saveSettings();
+    if (success) {
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    }
+  };
+
+  const handleReset = () => {
+    resetToDefaults();
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="flex items-center gap-3 text-zinc-400"
+        >
+          {Icons.loader}
+          <span>Loading settings...</span>
+        </motion.div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn('min-h-screen bg-zinc-950 p-3 sm:p-6', isRTL && 'rtl')}>
+      <div className="max-w-2xl mx-auto space-y-4 sm:space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-lg sm:text-xl font-semibold text-white">{t.title}</h1>
+            <p className="text-zinc-500 text-xs sm:text-sm mt-1">{t.subtitle}</p>
+          </div>
+
+          {/* Help button */}
+          <FloatingPanelRoot>
+            <FloatingPanelTrigger className="rounded-lg">
+              {Icons.info}
+            </FloatingPanelTrigger>
+            <FloatingPanelContent className="w-96">
+              <FloatingPanelHeader>{t.helpTitle}</FloatingPanelHeader>
+              <FloatingPanelBody>
+                <p className="text-sm text-zinc-400">{t.helpContent}</p>
+              </FloatingPanelBody>
+              <FloatingPanelFooter>
+                <FloatingPanelCloseButton>Close</FloatingPanelCloseButton>
+              </FloatingPanelFooter>
+            </FloatingPanelContent>
+          </FloatingPanelRoot>
+        </div>
+
+        {/* Sync Status */}
+        <div className={cn(
+          "flex items-center gap-2 px-3 py-2 rounded-lg text-xs",
+          isAuthenticated
+            ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+            : "bg-zinc-800/50 text-zinc-500 border border-zinc-700/50"
+        )}>
+          {isAuthenticated ? Icons.cloud : Icons.user}
+          <span>{isAuthenticated ? t.cloudSync : t.localOnly}</span>
+          {!isAuthenticated && (
+            <span className="text-zinc-600 ml-1">• {t.signInToSync}</span>
+          )}
+        </div>
+
+        {/* Smart Veto Detection */}
+        <SettingsSection
+          icon={Icons.brain}
+          title={t.detection.title}
+          description={t.detection.description}
+          defaultOpen={true}
+        >
+          <div className="space-y-6">
+            <SliderSetting
+              label={t.detection.primary}
+              description={t.detection.primaryDesc}
+              value={settings.primary_threshold}
+              onChange={(v) => updateSetting('primary_threshold', v)}
+              min={10}
+              max={95}
+              color="red"
+              marks={[
+                { value: 10, label: '10% (Sensitive)' },
+                { value: 50, label: '50%' },
+                { value: 95, label: '95% (Strict)' },
+              ]}
+            />
+
+            <div className="h-px bg-zinc-800" />
+
+            <SliderSetting
+              label={t.detection.veto}
+              description={t.detection.vetoDesc}
+              value={settings.veto_threshold}
+              onChange={(v) => updateSetting('veto_threshold', v)}
+              min={1}
+              max={20}
+              color="orange"
+              marks={[
+                { value: 1, label: '1% (Aggressive)' },
+                { value: 4, label: '4%' },
+                { value: 20, label: '20% (Lenient)' },
+              ]}
+            />
+          </div>
+        </SettingsSection>
+
+        {/* Fight Alert Triggers */}
+        <SettingsSection
+          icon={Icons.zap}
+          title={t.alerts.title}
+          description={t.alerts.description}
+        >
+          <div className="space-y-6">
+            {/* Instant Trigger */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="text-amber-400">{Icons.zap}</div>
+                <div>
+                  <p className="text-sm font-medium text-white">{t.alerts.instant}</p>
+                  <p className="text-xs text-zinc-500">{t.alerts.instantDesc}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <NumberSetting
+                  label={t.alerts.threshold}
+                  value={settings.instant_trigger_threshold}
+                  onChange={(v) => updateSetting('instant_trigger_threshold', v)}
+                  min={50}
+                  max={100}
+                  unit="%"
+                />
+                <NumberSetting
+                  label={t.alerts.count}
+                  value={settings.instant_trigger_count}
+                  onChange={(v) => updateSetting('instant_trigger_count', v)}
+                  min={1}
+                  max={10}
+                  unit={t.alerts.frames}
+                />
+              </div>
+              <p className="text-xs text-amber-400/70 mt-2">
+                {settings.instant_trigger_count}× frames at {settings.instant_trigger_threshold}%+
+              </p>
+            </div>
+
+            <div className="h-px bg-zinc-800" />
+
+            {/* Sustained Trigger */}
+            <div>
+              <div className="flex items-center gap-2 mb-4">
+                <div className="text-amber-400">{Icons.clock}</div>
+                <div>
+                  <p className="text-sm font-medium text-white">{t.alerts.sustained}</p>
+                  <p className="text-xs text-zinc-500">{t.alerts.sustainedDesc}</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <NumberSetting
+                  label={t.alerts.threshold}
+                  value={settings.sustained_threshold}
+                  onChange={(v) => updateSetting('sustained_threshold', v)}
+                  min={30}
+                  max={95}
+                  unit="%"
+                />
+                <NumberSetting
+                  label={t.alerts.duration}
+                  value={settings.sustained_duration}
+                  onChange={(v) => updateSetting('sustained_duration', v)}
+                  min={1}
+                  max={10}
+                  unit={t.alerts.seconds}
+                />
+              </div>
+              <p className="text-xs text-amber-400/70 mt-2">
+                {settings.sustained_duration}s sustained at {settings.sustained_threshold}%+
+              </p>
+            </div>
+          </div>
+        </SettingsSection>
+
+        {/* Preferences */}
+        <SettingsSection
+          icon={Icons.bell}
+          title={t.preferences.title}
+          description={t.preferences.description}
+        >
+          <div className="space-y-2">
+            <ToggleSetting
+              label={t.preferences.sound}
+              description={t.preferences.soundDesc}
+              checked={settings.sound_enabled}
+              onChange={(v) => updateSetting('sound_enabled', v)}
+            />
+            <div className="h-px bg-zinc-800" />
+            <ToggleSetting
+              label={t.preferences.autoRecord}
+              description={t.preferences.autoRecordDesc}
+              checked={settings.auto_record}
+              onChange={(v) => updateSetting('auto_record', v)}
+            />
+          </div>
+        </SettingsSection>
+
+        {/* Language */}
+        <SettingsSection
+          icon={Icons.globe}
+          title={t.language.title}
+          description={t.language.description}
+        >
+          <div className="flex items-center justify-between py-2">
+            <div>
+              <p className="text-sm text-white">{t.language.current}</p>
+              <p className="text-xs text-zinc-500">{locale === 'en' ? 'English' : 'العربية'}</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setLocale('en')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-sm transition-colors",
+                  locale === 'en'
+                    ? "bg-zinc-700 text-white"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                )}
+              >
+                English
+              </button>
+              <button
+                onClick={() => setLocale('ar')}
+                className={cn(
+                  "px-3 py-1.5 rounded-lg text-sm transition-colors",
+                  locale === 'ar'
+                    ? "bg-zinc-700 text-white"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                )}
+              >
+                العربية
+              </button>
+            </div>
+          </div>
+        </SettingsSection>
+
+        {/* Summary */}
+        <SummaryBox
+          title={t.summary}
+          items={[
+            { label: t.violenceCutoff, value: `${settings.primary_threshold}%`, color: 'text-red-400' },
+            { label: t.vetoOverride, value: `<${settings.veto_threshold}%`, color: 'text-orange-400' },
+            { label: t.instantAlert, value: `${settings.instant_trigger_count}×${settings.instant_trigger_threshold}%`, color: 'text-amber-400' },
+            { label: t.sustainedAlert, value: `${settings.sustained_duration}s@${settings.sustained_threshold}%`, color: 'text-amber-400' },
+          ]}
+        />
+
+        {/* Actions - Mobile optimized */}
+        <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 pt-4">
+          <button
+            onClick={handleReset}
+            className="px-4 py-3 min-h-[48px] text-sm text-zinc-400 hover:text-white transition-colors active:scale-95 order-2 sm:order-1"
+          >
+            {t.resetDefaults}
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className={cn(
+              "flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] rounded-lg text-sm font-medium transition-all active:scale-95 order-1 sm:order-2",
+              saved
+                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                : "bg-zinc-800 text-white hover:bg-zinc-700 border border-zinc-700"
+            )}
+          >
+            <AnimatePresence mode="wait">
+              {isSaving ? (
+                <motion.span
+                  key="saving"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-2"
+                >
+                  {Icons.loader}
+                  {t.saving}
+                </motion.span>
+              ) : saved ? (
+                <motion.span
+                  key="saved"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-2"
+                >
+                  {Icons.check}
+                  {t.saved}
+                </motion.span>
+              ) : (
+                <motion.span
+                  key="save"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                >
+                  {t.saveChanges}
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

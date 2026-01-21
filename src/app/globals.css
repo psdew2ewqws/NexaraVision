@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+:root {
+  /* NexaraVision Design System - Dark Theme */
+  --background: #000000;
+  --foreground: #e2e8f0;
+
+  /* Color Palette */
+  --card-bg: #1e293b;
+  --border: rgba(59, 130, 246, 0.3);
+  --text-primary: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --accent-blue: #60a5fa;
+  --success-green: #22c55e;
+  --danger-red: #ef4444;
+  --warning-yellow: #f59e0b;
+
+  /* shadcn/ui CSS Variables */
+  --radius: 0.5rem;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  /* Custom colors for NexaraVision */
+  --color-card-bg: var(--card-bg);
+  --color-border: var(--border);
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-accent-blue: var(--accent-blue);
+  --color-success-green: var(--success-green);
+  --color-danger-red: var(--danger-red);
+  --color-warning-yellow: var(--warning-yellow);
+}
+
+body {
+  background: linear-gradient(135deg, #000000 0%, #0a1929 25%, #1a2942 50%, #0a1929 75%, #000000 100%);
+  background-attachment: fixed;
+  color: var(--foreground);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  min-height: 100vh;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(10, 25, 41, 0.5);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-blue);
+  border-radius: 5px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(96, 165, 250, 0.8);
+}

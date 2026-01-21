@@ -1,0 +1,171 @@
+{
+  "common": {
+    "appName": "نكسارا فيجن",
+    "tagline": "كشف العنف بالذكاء الاصطناعي",
+    "loading": "جاري التحميل...",
+    "error": "حدث خطأ",
+    "save": "حفظ",
+    "cancel": "إلغاء",
+    "delete": "حذف",
+    "edit": "تعديل",
+    "search": "بحث",
+    "filter": "تصفية",
+    "export": "تصدير",
+    "refresh": "تحديث",
+    "back": "رجوع",
+    "next": "التالي",
+    "close": "إغلاق",
+    "confirm": "تأكيد",
+    "yes": "نعم",
+    "no": "لا"
+  },
+  "auth": {
+    "login": "تسجيل الدخول",
+    "logout": "تسجيل الخروج",
+    "signup": "إنشاء حساب",
+    "email": "البريد الإلكتروني",
+    "password": "كلمة المرور",
+    "forgotPassword": "نسيت كلمة المرور؟",
+    "rememberMe": "تذكرني",
+    "signingIn": "جاري تسجيل الدخول...",
+    "noAccount": "ليس لديك حساب؟",
+    "contactAdmin": "تواصل مع المسؤول",
+    "securityNote": "محمي بأمان على مستوى المؤسسات"
+  },
+  "nav": {
+    "dashboard": "لوحة التحكم",
+    "liveDetection": "الكشف المباشر",
+    "analysis": "التحليلات",
+    "cameras": "الكاميرات",
+    "alerts": "التنبيهات",
+    "incidents": "الحوادث",
+    "settings": "الإعدادات",
+    "users": "المستخدمون",
+    "reports": "التقارير"
+  },
+  "dashboard": {
+    "title": "لوحة التحكم",
+    "activeCameras": "الكاميرات النشطة",
+    "todaysIncidents": "حوادث اليوم",
+    "falsePositiveRate": "معدل الإنذارات الخاطئة",
+    "systemUptime": "وقت تشغيل النظام",
+    "recentIncidents": "الحوادث الأخيرة",
+    "systemPerformance": "أداء النظام",
+    "cameraStatus": "حالة الكاميرات",
+    "detectionAccuracy": "دقة الكشف",
+    "cameraUptime": "وقت تشغيل الكاميرات",
+    "responseTime": "زمن الاستجابة",
+    "storageUsed": "التخزين المستخدم",
+    "last24Hours": "آخر 24 ساعة",
+    "viewAll": "عرض الكل",
+    "expand": "توسيع",
+    "aiAssistant": "المساعد الذكي"
+  },
+  "live": {
+    "title": "الكشف المباشر",
+    "startDetection": "بدء الكشف",
+    "stopDetection": "إيقاف الكشف",
+    "cameraFeed": "بث الكاميرا",
+    "detectionStatus": "حالة الكشف",
+    "confidence": "نسبة الثقة",
+    "frameRate": "معدل الإطارات",
+    "latency": "زمن التأخير",
+    "recording": "جاري التسجيل",
+    "noViolence": "لم يتم اكتشاف عنف",
+    "violenceDetected": "تم اكتشاف عنف!",
+    "connecting": "جاري الاتصال...",
+    "connected": "متصل",
+    "disconnected": "غير متصل"
+  },
+  "alerts": {
+    "title": "التنبيهات",
+    "newAlert": "تنبيه جديد",
+    "alertHistory": "سجل التنبيهات",
+    "acknowledge": "تأكيد الاستلام",
+    "resolve": "حل المشكلة",
+    "markFalsePositive": "تحديد كإنذار خاطئ",
+    "status": {
+      "detected": "تم الاكتشاف",
+      "acknowledged": "تم التأكيد",
+      "responding": "جاري الاستجابة",
+      "resolved": "تم الحل",
+      "falsePositive": "إنذار خاطئ"
+    },
+    "priority": {
+      "high": "عالي",
+      "medium": "متوسط",
+      "low": "منخفض"
+    },
+    "noAlerts": "لا توجد تنبيهات حالياً",
+    "viewDetails": "عرض التفاصيل"
+  },
+  "incidents": {
+    "title": "الحوادث",
+    "incidentDetails": "تفاصيل الحادثة",
+    "camera": "الكاميرا",
+    "location": "الموقع",
+    "timestamp": "الوقت",
+    "duration": "المدة",
+    "model": "النموذج المستخدم",
+    "violenceScore": "درجة العنف",
+    "resolution": "ملاحظات الحل",
+    "timeline": "الجدول الزمني",
+    "evidence": "الأدلة",
+    "downloadClip": "تحميل المقطع",
+    "shareReport": "مشاركة التقرير"
+  },
+  "cameras": {
+    "title": "الكاميرات",
+    "addCamera": "إضافة كاميرا",
+    "editCamera": "تعديل الكاميرا",
+    "cameraName": "اسم الكاميرا",
+    "streamUrl": "رابط البث",
+    "location": "الموقع",
+    "sensitivity": "الحساسية",
+    "status": {
+      "online": "متصل",
+      "offline": "غير متصل",
+      "maintenance": "صيانة"
+    },
+    "gridPosition": "موقع الشبكة",
+    "lastActive": "آخر نشاط"
+  },
+  "settings": {
+    "title": "الإعدادات",
+    "profile": "الملف الشخصي",
+    "notifications": "الإشعارات",
+    "alertChannels": "قنوات التنبيه",
+    "language": "اللغة",
+    "theme": "المظهر",
+    "security": "الأمان",
+    "whatsapp": "تنبيهات واتساب",
+    "telegram": "تنبيهات تيليجرام",
+    "discord": "تنبيهات ديسكورد",
+    "email": "تنبيهات البريد",
+    "push": "الإشعارات الفورية",
+    "quietHours": "ساعات الهدوء",
+    "minConfidence": "الحد الأدنى للثقة",
+    "english": "English",
+    "arabic": "العربية"
+  },
+  "users": {
+    "title": "المستخدمون",
+    "addUser": "إضافة مستخدم",
+    "role": {
+      "admin": "مدير",
+      "manager": "مشرف",
+      "guard": "حارس"
+    },
+    "fullName": "الاسم الكامل",
+    "phone": "الهاتف",
+    "lastLogin": "آخر دخول"
+  },
+  "time": {
+    "now": "الآن",
+    "minutesAgo": "منذ {count} دقيقة",
+    "hoursAgo": "منذ {count} ساعة",
+    "daysAgo": "منذ {count} أيام",
+    "today": "اليوم",
+    "yesterday": "أمس"
+  }
+}

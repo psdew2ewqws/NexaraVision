@@ -1,0 +1,171 @@
+{
+  "common": {
+    "appName": "NexaraVision",
+    "tagline": "AI-Powered Violence Detection",
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "search": "Search",
+    "filter": "Filter",
+    "export": "Export",
+    "refresh": "Refresh",
+    "back": "Back",
+    "next": "Next",
+    "close": "Close",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No"
+  },
+  "auth": {
+    "login": "Sign In",
+    "logout": "Logout",
+    "signup": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "forgotPassword": "Forgot password?",
+    "rememberMe": "Remember me",
+    "signingIn": "Signing in...",
+    "noAccount": "Don't have an account?",
+    "contactAdmin": "Contact Admin",
+    "securityNote": "Protected by enterprise-grade security"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "liveDetection": "Live Detection",
+    "analysis": "Analysis",
+    "cameras": "Cameras",
+    "alerts": "Alerts",
+    "incidents": "Incidents",
+    "settings": "Settings",
+    "users": "Users",
+    "reports": "Reports"
+  },
+  "dashboard": {
+    "title": "Dashboard",
+    "activeCameras": "Active Cameras",
+    "todaysIncidents": "Today's Incidents",
+    "falsePositiveRate": "False Positive Rate",
+    "systemUptime": "System Uptime",
+    "recentIncidents": "Recent Incidents",
+    "systemPerformance": "System Performance",
+    "cameraStatus": "Camera Status Grid",
+    "detectionAccuracy": "Detection Accuracy",
+    "cameraUptime": "Camera Uptime",
+    "responseTime": "Response Time",
+    "storageUsed": "Storage Used",
+    "last24Hours": "Last 24 Hours",
+    "viewAll": "View All",
+    "expand": "Expand",
+    "aiAssistant": "AI Assistant"
+  },
+  "live": {
+    "title": "Live Detection",
+    "startDetection": "Start Detection",
+    "stopDetection": "Stop Detection",
+    "cameraFeed": "Camera Feed",
+    "detectionStatus": "Detection Status",
+    "confidence": "Confidence",
+    "frameRate": "Frame Rate",
+    "latency": "Latency",
+    "recording": "Recording",
+    "noViolence": "No Violence Detected",
+    "violenceDetected": "Violence Detected!",
+    "connecting": "Connecting...",
+    "connected": "Connected",
+    "disconnected": "Disconnected"
+  },
+  "alerts": {
+    "title": "Alerts",
+    "newAlert": "New Alert",
+    "alertHistory": "Alert History",
+    "acknowledge": "Acknowledge",
+    "resolve": "Resolve",
+    "markFalsePositive": "Mark as False Positive",
+    "status": {
+      "detected": "Detected",
+      "acknowledged": "Acknowledged",
+      "responding": "Responding",
+      "resolved": "Resolved",
+      "falsePositive": "False Positive"
+    },
+    "priority": {
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "noAlerts": "No alerts at this time",
+    "viewDetails": "View Details"
+  },
+  "incidents": {
+    "title": "Incidents",
+    "incidentDetails": "Incident Details",
+    "camera": "Camera",
+    "location": "Location",
+    "timestamp": "Timestamp",
+    "duration": "Duration",
+    "model": "Model Used",
+    "violenceScore": "Violence Score",
+    "resolution": "Resolution Notes",
+    "timeline": "Timeline",
+    "evidence": "Evidence",
+    "downloadClip": "Download Clip",
+    "shareReport": "Share Report"
+  },
+  "cameras": {
+    "title": "Cameras",
+    "addCamera": "Add Camera",
+    "editCamera": "Edit Camera",
+    "cameraName": "Camera Name",
+    "streamUrl": "Stream URL",
+    "location": "Location",
+    "sensitivity": "Sensitivity",
+    "status": {
+      "online": "Online",
+      "offline": "Offline",
+      "maintenance": "Maintenance"
+    },
+    "gridPosition": "Grid Position",
+    "lastActive": "Last Active"
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": "Profile",
+    "notifications": "Notifications",
+    "alertChannels": "Alert Channels",
+    "language": "Language",
+    "theme": "Theme",
+    "security": "Security",
+    "whatsapp": "WhatsApp Alerts",
+    "telegram": "Telegram Alerts",
+    "discord": "Discord Alerts",
+    "email": "Email Alerts",
+    "push": "Push Notifications",
+    "quietHours": "Quiet Hours",
+    "minConfidence": "Minimum Confidence",
+    "english": "English",
+    "arabic": "العربية"
+  },
+  "users": {
+    "title": "Users",
+    "addUser": "Add User",
+    "role": {
+      "admin": "Admin",
+      "manager": "Manager",
+      "guard": "Guard"
+    },
+    "fullName": "Full Name",
+    "phone": "Phone",
+    "lastLogin": "Last Login"
+  },
+  "time": {
+    "now": "Just now",
+    "minutesAgo": "{count} min ago",
+    "hoursAgo": "{count} hr ago",
+    "daysAgo": "{count} days ago",
+    "today": "Today",
+    "yesterday": "Yesterday"
+  }
+}
