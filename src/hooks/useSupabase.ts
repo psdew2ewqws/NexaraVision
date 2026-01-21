@@ -827,6 +827,22 @@ export async function createIncidentWithRecording(data: {
       uploadMediaInBackground(incident.id, data.videoBlob, data.thumbnailBlob);
     }
 
+    // Step 3: Send WhatsApp alerts to enabled users (non-blocking)
+    if (incident?.id) {
+      // Get camera and location names for the alert message
+      getIncidentDetails(data.camera_id, data.location_id).then(({ cameraName, locationName }) => {
+        sendWhatsAppAlerts({
+          incidentId: incident.id,
+          cameraId: data.camera_id,
+          cameraName,
+          locationId: data.location_id,
+          locationName,
+          confidence: safeConfidence,
+          timestamp: new Date().toISOString(),
+        });
+      });
+    }
+
     return { incident, error: null, video_url: undefined, thumbnail_url: undefined, throttled: false };
 
   } catch (err: unknown) {
@@ -1325,4 +1341,111 @@ export function useCameraIncidents(cameraId: string | null, limit = 20) {
   }, [cameraId, limit]);
 
   return { incidents, loading, error };
+}
+
+// ============================================
+// WHATSAPP ALERT NOTIFICATIONS
+// ============================================
+
+interface IncidentAlertData {
+  incidentId: string;
+  cameraId: string;
+  cameraName: string;
+  locationId: string;
+  locationName: string;
+  confidence: number;
+  timestamp: string;
+}
+
+/**
+ * Send WhatsApp alerts to all enabled users (non-blocking)
+ * Called automatically when a new incident is created
+ */
+export async function sendWhatsAppAlerts(alertData: IncidentAlertData): Promise<void> {
+  console.log('[WhatsApp] Starting alert distribution for incident:', alertData.incidentId);
+
+  try {
+    // Get all users with WhatsApp enabled
+    const { data: alertSettings, error } = await supabase
+      .from('alert_settings')
+      .select('user_id, whatsapp_number, min_confidence')
+      .eq('whatsapp_enabled', true)
+      .not('whatsapp_number', 'is', null);
+
+    if (error) {
+      console.error('[WhatsApp] Failed to get recipients:', error.message);
+      return;
+    }
+
+    if (!alertSettings || alertSettings.length === 0) {
+      console.log('[WhatsApp] No users with WhatsApp alerts enabled');
+      return;
+    }
+
+    // Filter by minimum confidence threshold
+    const eligibleUsers = alertSettings.filter(
+      (s) => alertData.confidence >= (s.min_confidence || 0)
+    );
+
+    console.log(`[WhatsApp] Sending to ${eligibleUsers.length} users (${alertSettings.length} total enabled)`);
+
+    // Send alerts in parallel
+    const sendPromises = eligibleUsers.map(async (settings) => {
+      try {
+        const response = await fetch('/api/whatsapp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: settings.whatsapp_number,
+            incidentId: alertData.incidentId,
+            cameraName: alertData.cameraName,
+            locationName: alertData.locationName,
+            confidence: alertData.confidence,
+            timestamp: alertData.timestamp,
+          }),
+        });
+
+        const result = await response.json();
+
+        // Log alert to database
+        await supabase.from('alerts').insert({
+          incident_id: alertData.incidentId,
+          user_id: settings.user_id,
+          channel: 'whatsapp',
+          sent_at: result.success ? new Date().toISOString() : null,
+          failed_at: result.success ? null : new Date().toISOString(),
+          error_message: result.error || null,
+          message_preview: `Violence alert: ${alertData.locationName}`,
+        });
+
+        if (result.success) {
+          console.log('[WhatsApp] ✅ Alert sent to:', settings.whatsapp_number);
+        } else {
+          console.error('[WhatsApp] ❌ Failed to send to:', settings.whatsapp_number, result.error);
+        }
+      } catch (err) {
+        console.error('[WhatsApp] ❌ Exception sending to:', settings.whatsapp_number, err);
+      }
+    });
+
+    await Promise.all(sendPromises);
+    console.log('[WhatsApp] Alert distribution complete');
+  } catch (err) {
+    console.error('[WhatsApp] Alert distribution failed:', err);
+  }
+}
+
+/**
+ * Helper to get camera and location names for alert
+ */
+async function getIncidentDetails(cameraId: string, locationId: string): Promise<{ cameraName: string; locationName: string }> {
+  const [cameraResult, locationResult] = await Promise.all([
+    supabase.from('cameras').select('name').eq('id', cameraId).single(),
+    supabase.from('locations').select('name').eq('id', locationId).single(),
+  ]);
+
+  return {
+    cameraName: cameraResult.data?.name || 'Unknown Camera',
+    locationName: locationResult.data?.name || 'Unknown Location',
+  };
 }

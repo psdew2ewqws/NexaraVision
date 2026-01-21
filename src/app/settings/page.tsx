@@ -1,10 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/lib/utils';
 import { useDetectionSettings, DEFAULT_DETECTION_SETTINGS } from '@/hooks/useDetectionSettings';
+import { useAlertSettings } from '@/hooks/useAlertSettings';
+import { useAuth } from '@/contexts/AuthContext';
 import {
   SettingsSection,
   SliderSetting,
@@ -94,6 +96,16 @@ const Icons = {
       <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
     </svg>
   ),
+  whatsapp: (
+    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"/>
+    </svg>
+  ),
+  send: (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5" />
+    </svg>
+  ),
 };
 
 const translations = {
@@ -133,6 +145,23 @@ const translations = {
       title: 'Language & Region',
       description: 'Change interface language',
       current: 'Current',
+    },
+    whatsapp: {
+      title: 'WhatsApp Notifications',
+      description: 'Receive violence alerts on WhatsApp',
+      enable: 'Enable WhatsApp Alerts',
+      enableDesc: 'Get instant notifications when violence is detected',
+      phone: 'Phone Number',
+      phoneDesc: 'Include country code (e.g., +966501234567)',
+      phonePlaceholder: '+966501234567',
+      test: 'Send Test',
+      testing: 'Sending...',
+      testSuccess: 'Test message sent!',
+      testFailed: 'Failed to send',
+      save: 'Save Number',
+      saved: 'Number saved',
+      minConfidence: 'Minimum Confidence',
+      minConfidenceDesc: 'Only alert when confidence exceeds this threshold',
     },
     summary: 'Configuration Summary',
     violenceCutoff: 'Violence Cutoff',
@@ -186,6 +215,23 @@ const translations = {
       description: 'تغيير لغة الواجهة',
       current: 'الحالية',
     },
+    whatsapp: {
+      title: 'إشعارات واتساب',
+      description: 'تلقي تنبيهات العنف على واتساب',
+      enable: 'تفعيل تنبيهات واتساب',
+      enableDesc: 'احصل على إشعارات فورية عند اكتشاف العنف',
+      phone: 'رقم الهاتف',
+      phoneDesc: 'أدخل رمز الدولة (مثال: 966501234567+)',
+      phonePlaceholder: '+966501234567',
+      test: 'إرسال تجربة',
+      testing: 'جاري الإرسال...',
+      testSuccess: 'تم إرسال الرسالة التجريبية!',
+      testFailed: 'فشل الإرسال',
+      save: 'حفظ الرقم',
+      saved: 'تم حفظ الرقم',
+      minConfidence: 'الحد الأدنى للثقة',
+      minConfidenceDesc: 'التنبيه فقط عندما تتجاوز الثقة هذا الحد',
+    },
     summary: 'ملخص التكوين',
     violenceCutoff: 'حد العنف',
     vetoOverride: 'تجاوز الفيتو',
@@ -207,6 +253,7 @@ export default function SettingsPage() {
   const { locale, isRTL, setLocale } = useLanguage();
   const t = translations[locale as 'en' | 'ar'] || translations.en;
   const [saved, setSaved] = useState(false);
+  const { user } = useAuth();
 
   const {
     settings,
@@ -217,6 +264,59 @@ export default function SettingsPage() {
     resetToDefaults,
     isAuthenticated,
   } = useDetectionSettings();
+
+  // WhatsApp settings
+  const {
+    settings: alertSettings,
+    loading: alertLoading,
+    saving: alertSaving,
+    updateSettings: updateAlertSettings,
+    testWhatsApp,
+  } = useAlertSettings(user?.id);
+
+  const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [whatsappTesting, setWhatsappTesting] = useState(false);
+  const [whatsappTestResult, setWhatsappTestResult] = useState<'success' | 'failed' | null>(null);
+
+  // Load WhatsApp phone from settings
+  useEffect(() => {
+    if (alertSettings?.whatsapp_number) {
+      setWhatsappPhone(alertSettings.whatsapp_number);
+    }
+  }, [alertSettings?.whatsapp_number]);
+
+  const handleWhatsAppToggle = async (enabled: boolean) => {
+    if (enabled && !whatsappPhone) {
+      return; // Don't enable without a phone number
+    }
+    await updateAlertSettings({
+      whatsapp_enabled: enabled,
+      whatsapp_number: enabled ? whatsappPhone : alertSettings?.whatsapp_number,
+    });
+  };
+
+  const handleWhatsAppSave = async () => {
+    if (!whatsappPhone) return;
+    await updateAlertSettings({
+      whatsapp_number: whatsappPhone,
+    });
+    setWhatsappTestResult('success');
+    setTimeout(() => setWhatsappTestResult(null), 2000);
+  };
+
+  const handleWhatsAppTest = async () => {
+    if (!whatsappPhone) return;
+    setWhatsappTesting(true);
+    setWhatsappTestResult(null);
+    const result = await testWhatsApp(whatsappPhone);
+    setWhatsappTesting(false);
+    setWhatsappTestResult(result.success ? 'success' : 'failed');
+    setTimeout(() => setWhatsappTestResult(null), 3000);
+  };
+
+  const handleMinConfidenceChange = async (value: number) => {
+    await updateAlertSettings({ min_confidence: value / 100 });
+  };
 
   const handleSave = async () => {
     const success = await saveSettings();
@@ -230,7 +330,7 @@ export default function SettingsPage() {
     resetToDefaults();
   };
 
-  if (isLoading) {
+  if (isLoading || alertLoading) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
         <motion.div
@@ -422,6 +522,113 @@ export default function SettingsPage() {
               description={t.preferences.autoRecordDesc}
               checked={settings.auto_record}
               onChange={(v) => updateSetting('auto_record', v)}
+            />
+          </div>
+        </SettingsSection>
+
+        {/* WhatsApp Notifications */}
+        <SettingsSection
+          icon={Icons.whatsapp}
+          title={t.whatsapp.title}
+          description={t.whatsapp.description}
+        >
+          <div className="space-y-4">
+            <ToggleSetting
+              label={t.whatsapp.enable}
+              description={t.whatsapp.enableDesc + (!whatsappPhone ? ' (Enter phone number first)' : '')}
+              checked={alertSettings?.whatsapp_enabled || false}
+              onChange={handleWhatsAppToggle}
+            />
+
+            <div className="h-px bg-zinc-800" />
+
+            {/* Phone Number Input */}
+            <div className="space-y-2">
+              <label className="block text-sm font-medium text-white">
+                {t.whatsapp.phone}
+              </label>
+              <p className="text-xs text-zinc-500">{t.whatsapp.phoneDesc}</p>
+              <div className="flex gap-2">
+                <input
+                  type="tel"
+                  value={whatsappPhone}
+                  onChange={(e) => setWhatsappPhone(e.target.value)}
+                  placeholder={t.whatsapp.phonePlaceholder}
+                  className={cn(
+                    "flex-1 px-3 py-2 rounded-lg text-sm",
+                    "bg-zinc-800 border border-zinc-700 text-white",
+                    "placeholder:text-zinc-500",
+                    "focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50",
+                    isRTL && "text-right"
+                  )}
+                  dir="ltr"
+                />
+                <button
+                  onClick={handleWhatsAppSave}
+                  disabled={alertSaving || !whatsappPhone}
+                  className={cn(
+                    "px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                    "bg-zinc-700 text-white hover:bg-zinc-600",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  {alertSaving ? Icons.loader : t.whatsapp.save}
+                </button>
+              </div>
+            </div>
+
+            {/* Test Message Button */}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleWhatsAppTest}
+                disabled={whatsappTesting || !whatsappPhone}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                  whatsappTestResult === 'success'
+                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                    : whatsappTestResult === 'failed'
+                    ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                    : "bg-emerald-600 text-white hover:bg-emerald-500",
+                  "disabled:opacity-50 disabled:cursor-not-allowed"
+                )}
+              >
+                {whatsappTesting ? (
+                  <>
+                    {Icons.loader}
+                    {t.whatsapp.testing}
+                  </>
+                ) : whatsappTestResult === 'success' ? (
+                  <>
+                    {Icons.check}
+                    {t.whatsapp.testSuccess}
+                  </>
+                ) : whatsappTestResult === 'failed' ? (
+                  t.whatsapp.testFailed
+                ) : (
+                  <>
+                    {Icons.send}
+                    {t.whatsapp.test}
+                  </>
+                )}
+              </button>
+            </div>
+
+            <div className="h-px bg-zinc-800" />
+
+            {/* Min Confidence Slider */}
+            <SliderSetting
+              label={t.whatsapp.minConfidence}
+              description={t.whatsapp.minConfidenceDesc}
+              value={Math.round((alertSettings?.min_confidence || 0.7) * 100)}
+              onChange={handleMinConfidenceChange}
+              min={30}
+              max={95}
+              color="green"
+              marks={[
+                { value: 30, label: '30%' },
+                { value: 70, label: '70%' },
+                { value: 95, label: '95%' },
+              ]}
             />
           </div>
         </SettingsSection>
