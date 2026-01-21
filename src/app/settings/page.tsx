@@ -277,6 +277,7 @@ export default function SettingsPage() {
   const [whatsappPhone, setWhatsappPhone] = useState('');
   const [whatsappTesting, setWhatsappTesting] = useState(false);
   const [whatsappTestResult, setWhatsappTestResult] = useState<'success' | 'failed' | null>(null);
+  const [whatsappError, setWhatsappError] = useState<string | null>(null);
 
   // Load WhatsApp phone from settings
   useEffect(() => {
@@ -308,10 +309,17 @@ export default function SettingsPage() {
     if (!whatsappPhone) return;
     setWhatsappTesting(true);
     setWhatsappTestResult(null);
+    setWhatsappError(null);
     const result = await testWhatsApp(whatsappPhone);
     setWhatsappTesting(false);
     setWhatsappTestResult(result.success ? 'success' : 'failed');
-    setTimeout(() => setWhatsappTestResult(null), 3000);
+    if (!result.success && result.error) {
+      setWhatsappError(result.error);
+    }
+    setTimeout(() => {
+      setWhatsappTestResult(null);
+      setWhatsappError(null);
+    }, 5000);
   };
 
   const handleMinConfidenceChange = async (value: number) => {
@@ -578,39 +586,47 @@ export default function SettingsPage() {
             </div>
 
             {/* Test Message Button */}
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleWhatsAppTest}
-                disabled={whatsappTesting || !whatsappPhone}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                  whatsappTestResult === 'success'
-                    ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
-                    : whatsappTestResult === 'failed'
-                    ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                    : "bg-emerald-600 text-white hover:bg-emerald-500",
-                  "disabled:opacity-50 disabled:cursor-not-allowed"
-                )}
-              >
-                {whatsappTesting ? (
-                  <>
-                    {Icons.loader}
-                    {t.whatsapp.testing}
-                  </>
-                ) : whatsappTestResult === 'success' ? (
-                  <>
-                    {Icons.check}
-                    {t.whatsapp.testSuccess}
-                  </>
-                ) : whatsappTestResult === 'failed' ? (
-                  t.whatsapp.testFailed
-                ) : (
-                  <>
-                    {Icons.send}
-                    {t.whatsapp.test}
-                  </>
-                )}
-              </button>
+            <div className="space-y-2">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleWhatsAppTest}
+                  disabled={whatsappTesting || !whatsappPhone}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                    whatsappTestResult === 'success'
+                      ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                      : whatsappTestResult === 'failed'
+                      ? "bg-red-500/20 text-red-400 border border-red-500/30"
+                      : "bg-emerald-600 text-white hover:bg-emerald-500",
+                    "disabled:opacity-50 disabled:cursor-not-allowed"
+                  )}
+                >
+                  {whatsappTesting ? (
+                    <>
+                      {Icons.loader}
+                      {t.whatsapp.testing}
+                    </>
+                  ) : whatsappTestResult === 'success' ? (
+                    <>
+                      {Icons.check}
+                      {t.whatsapp.testSuccess}
+                    </>
+                  ) : whatsappTestResult === 'failed' ? (
+                    t.whatsapp.testFailed
+                  ) : (
+                    <>
+                      {Icons.send}
+                      {t.whatsapp.test}
+                    </>
+                  )}
+                </button>
+              </div>
+              {/* Error message display */}
+              {whatsappError && (
+                <p className="text-xs text-red-400 bg-red-500/10 px-3 py-2 rounded-lg">
+                  Error: {whatsappError}
+                </p>
+              )}
             </div>
 
             <div className="h-px bg-zinc-800" />

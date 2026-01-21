@@ -24,9 +24,17 @@ export async function POST(request: NextRequest) {
     const instanceId = process.env.WHATSAPP_INSTANCE_ID;
     const token = process.env.WHATSAPP_TOKEN;
 
+    console.log('[WhatsApp Test] Config check - instanceId exists:', !!instanceId, 'token exists:', !!token);
+
     if (!instanceId || !token) {
       return NextResponse.json(
-        { error: 'WhatsApp not configured. Please set WHATSAPP_INSTANCE_ID and WHATSAPP_TOKEN.' },
+        {
+          error: 'WhatsApp not configured on server',
+          details: {
+            instanceId: instanceId ? 'SET' : 'MISSING',
+            token: token ? 'SET' : 'MISSING',
+          }
+        },
         { status: 500 }
       );
     }
@@ -52,6 +60,8 @@ You will receive notifications when violence is detected by your surveillance sy
 
     console.log('[WhatsApp Test] Sending test to:', formattedPhone);
 
+    console.log('[WhatsApp Test] Calling API:', url.replace(token, '***'));
+
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -59,9 +69,21 @@ You will receive notifications when violence is detected by your surveillance sy
       },
     });
 
-    const data = await response.json();
+    const responseText = await response.text();
+    console.log('[WhatsApp Test] Raw response:', responseText);
 
-    if (data.sent) {
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      return NextResponse.json(
+        { error: 'Invalid response from WhatsApp API', details: responseText },
+        { status: 500 }
+      );
+    }
+
+    // 4whats API returns { sent: true } on success
+    if (data.sent === true) {
       console.log('[WhatsApp Test] Success:', data.id);
       return NextResponse.json({
         success: true,
@@ -71,14 +93,20 @@ You will receive notifications when violence is detected by your surveillance sy
     } else {
       console.error('[WhatsApp Test] Failed:', data);
       return NextResponse.json(
-        { error: 'Failed to send test message', details: data },
+        {
+          error: data.message || data.error || 'Failed to send test message',
+          details: data
+        },
         { status: 400 }
       );
     }
   } catch (error) {
     console.error('[WhatsApp Test] Error:', error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Unknown error' },
+      {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined
+      },
       { status: 500 }
     );
   }
