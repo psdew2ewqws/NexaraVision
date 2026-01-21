@@ -152,6 +152,7 @@ const translations = {
       connecting: 'Connecting...',
       active: 'Monitoring',
       detecting: 'Violence Detected!',
+      paused: 'Paused',
       error: 'Connection Error',
     },
     stats: {
@@ -212,6 +213,7 @@ const translations = {
       connecting: 'جاري الاتصال...',
       active: 'قيد المراقبة',
       detecting: 'تم اكتشاف عنف!',
+      paused: 'متوقف مؤقتاً',
       error: 'خطأ في الاتصال',
     },
     stats: {
@@ -255,7 +257,8 @@ export default function LivePage() {
   const [isActive, setIsActive] = useState(false);
   const [isMuted, setIsMuted] = useState(true);
   const [currentViolence, setCurrentViolence] = useState(0);
-  const [status, setStatus] = useState<'idle' | 'connecting' | 'active' | 'detecting' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'connecting' | 'active' | 'detecting' | 'paused' | 'error'>('idle');
+  const lastViolenceRef = useRef<number>(0);  // Preserve violence reading on pause
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isGridMode, setIsGridMode] = useState(false);
   const [gridCameras, setGridCameras] = useState<CameraRegion[]>([]);
@@ -296,6 +299,9 @@ export default function LivePage() {
   const processedFrameCanvasRef = useRef<HTMLCanvasElement>(null);  // For server-processed frames with skeleton
   const streamRef = useRef<MediaStream | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  const pcRef = useRef<RTCPeerConnection | null>(null);  // WebRTC peer connection
+  const dcRef = useRef<RTCDataChannel | null>(null);  // WebRTC data channel for frames
+  const webrtcReadyRef = useRef<boolean>(false);  // Track if WebRTC is ready
   const animationRef = useRef<number | null>(null);
   const startTimeRef = useRef<number>(0);
   const _frameBufferRef = useRef<string[]>([]); // Reserved for future buffering
@@ -316,6 +322,9 @@ export default function LivePage() {
   const recordingCountdownRef = useRef<NodeJS.Timeout | null>(null);
   const currentIncidentIdRef = useRef<string | null>(null);
   const lastIncidentTimeRef = useRef<number>(0);
+  const lastFrameSentTimeRef = useRef<number>(0);  // For frame rate throttling
+  const TARGET_FPS = 10;  // 10 FPS = 100ms interval (reduced for smoother UI)
+  const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
 
   // Format duration
   const formatDuration = (seconds: number) => {
@@ -500,6 +509,107 @@ export default function LivePage() {
     }
   }, [detectionSettings]);
 
+  // Setup WebRTC DataChannel for low-latency frame transmission
+  const setupWebRTC = async () => {
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      console.warn('[WebRTC] WebSocket not ready for signaling');
+      return;
+    }
+
+    try {
+      // Create peer connection with STUN server for NAT traversal
+      const pc = new RTCPeerConnection({
+        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+      });
+      pcRef.current = pc;
+
+      // Create data channel for sending frames (ordered=false for lower latency)
+      const dc = pc.createDataChannel('frames', {
+        ordered: false,  // Allow out-of-order delivery (faster!)
+        maxRetransmits: 0  // Don't retransmit lost packets (real-time is more important)
+      });
+      dcRef.current = dc;
+
+      dc.onopen = () => {
+        console.log('[WebRTC] DataChannel OPEN - using low-latency UDP!');
+        webrtcReadyRef.current = true;
+      };
+
+      dc.onclose = () => {
+        console.log('[WebRTC] DataChannel closed');
+        webrtcReadyRef.current = false;
+      };
+
+      dc.onerror = (err) => {
+        console.error('[WebRTC] DataChannel error:', err);
+        webrtcReadyRef.current = false;
+      };
+
+      // Handle incoming messages on DataChannel (detection results)
+      dc.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          console.log('[WebRTC] Received:', { result: data.result, transport: data.transport, inference_ms: data.inference_ms });
+
+          // Process same as WebSocket message
+          if (data.result !== undefined && data.primary !== undefined) {
+            if (data.result === 'VIOLENCE') {
+              setVetoStatus('PRIMARY');
+              setVetoScore(data.veto / 100);
+            } else if (data.result === 'VETOED') {
+              setVetoStatus('VETO_OVERRIDE');
+              setVetoScore(data.veto / 100);
+            } else {
+              setVetoStatus('PRIMARY_FAST');
+              setVetoScore(null);
+            }
+
+            processDetectionResult({
+              violence_score: data.primary / 100,
+              t_total: data.inference_ms,
+              buffer_size: data.buffer,
+            });
+
+            if (data.skeletons && data.skeletons.length > 0) {
+              drawServerSkeletons(data.skeletons);
+            }
+          }
+        } catch (err) {
+          console.error('[WebRTC] Message parse error:', err);
+        }
+      };
+
+      // Handle ICE candidates
+      pc.onicecandidate = (event) => {
+        if (event.candidate && wsRef.current?.readyState === WebSocket.OPEN) {
+          wsRef.current.send(JSON.stringify({
+            type: 'ice_candidate',
+            candidate: event.candidate
+          }));
+        }
+      };
+
+      pc.onconnectionstatechange = () => {
+        console.log('[WebRTC] Connection state:', pc.connectionState);
+      };
+
+      // Create and send offer
+      const offer = await pc.createOffer();
+      await pc.setLocalDescription(offer);
+
+      wsRef.current.send(JSON.stringify({
+        type: 'webrtc_offer',
+        sdp: offer.sdp,
+        sdp_type: offer.type
+      }));
+      console.log('[WebRTC] Sent offer to server');
+
+    } catch (err) {
+      console.error('[WebRTC] Setup failed:', err);
+      webrtcReadyRef.current = false;
+    }
+  };
+
   // Connect WebSocket for server mode - returns Promise that resolves when connected
   const connectWebSocket = (): Promise<boolean> => {
     return new Promise((resolve) => {
@@ -528,6 +638,9 @@ export default function LivePage() {
           ws.send(JSON.stringify(configMessage));
           console.log('[WS] Sent initial config:', configMessage.settings);
 
+          // Setup WebRTC DataChannel for low-latency transmission
+          setTimeout(() => setupWebRTC(), 500);
+
           resolve(true);
         };
 
@@ -538,6 +651,21 @@ export default function LivePage() {
             // Handle config_updated confirmation (legacy v39)
             if (data.type === 'config_updated') {
               console.log('[WS] Config updated on server:', data.config);
+              return;
+            }
+
+            // Handle WebRTC answer from server
+            if (data.type === 'webrtc_answer') {
+              console.log('[WebRTC] Received answer from server');
+              if (pcRef.current) {
+                const answer = new RTCSessionDescription({
+                  type: data.sdp_type,
+                  sdp: data.sdp
+                });
+                pcRef.current.setRemoteDescription(answer)
+                  .then(() => console.log('[WebRTC] Remote description set'))
+                  .catch(err => console.error('[WebRTC] Failed to set remote description:', err));
+              }
               return;
             }
 
@@ -861,10 +989,9 @@ export default function LivePage() {
     }
   };
 
-  // Detection loop
+  // Detection loop with frame rate throttling (GAP-007 fix)
   const runDetectionLoop = useCallback(async () => {
     if (!isActive || !videoRef.current || !canvasRef.current) {
-      // Still schedule next frame if active to keep loop alive
       if (isActive) {
         animationRef.current = requestAnimationFrame(runDetectionLoop);
       }
@@ -879,15 +1006,40 @@ export default function LivePage() {
       return;
     }
 
+    // Skip if video is paused - don't send frames (GAP-004 fix)
+    if (video.paused || video.ended) {
+      animationRef.current = requestAnimationFrame(runDetectionLoop);
+      return;
+    }
+
+    // Frame rate throttling - only process at TARGET_FPS (GAP-007 fix)
+    const now = performance.now();
+    if (detectionMode === 'server' && now - lastFrameSentTimeRef.current < FRAME_INTERVAL_MS) {
+      animationRef.current = requestAnimationFrame(runDetectionLoop);
+      return;
+    }
+
     // Ensure video has valid dimensions
     if (video.videoWidth === 0 || video.videoHeight === 0) {
       animationRef.current = requestAnimationFrame(runDetectionLoop);
       return;
     }
 
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
+    // Constrain canvas size for performance (GAP-015 fix)
+    const MAX_WIDTH = 640;  // Reduced for faster processing
+    const MAX_HEIGHT = 480;
+    let canvasWidth = video.videoWidth;
+    let canvasHeight = video.videoHeight;
+
+    if (canvasWidth > MAX_WIDTH || canvasHeight > MAX_HEIGHT) {
+      const scale = Math.min(MAX_WIDTH / canvasWidth, MAX_HEIGHT / canvasHeight);
+      canvasWidth = Math.round(canvasWidth * scale);
+      canvasHeight = Math.round(canvasHeight * scale);
+    }
+
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
 
     setStats((prev) => ({
       ...prev,
@@ -903,24 +1055,45 @@ export default function LivePage() {
         console.error('Pose detection error:', err);
       }
     } else if (detectionMode === 'server') {
-      // Check WebSocket status - if not connected, keep loop running
+      // Check WebSocket status
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
         console.warn('[WS] Waiting for connection, state:', wsRef.current?.readyState);
         animationRef.current = requestAnimationFrame(runDetectionLoop);
         return;
       }
 
-      const frameData = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
+      // Skip if WebSocket buffer is too full (GAP-008 fix - prevent backlog)
+      if (wsRef.current.bufferedAmount > 256 * 1024) {  // 256KB threshold (reduced for faster response)
+        console.warn('[WS] Buffer full, skipping frame');
+        animationRef.current = requestAnimationFrame(runDetectionLoop);
+        return;
+      }
 
-      // Send frame to v39 server (expects type: 'image')
-      wsRef.current.send(
-        JSON.stringify({
-          type: 'image',
-          data: frameData,
-          width: canvas.width,
-          height: canvas.height,
-        })
-      );
+      // Use async toBlob instead of blocking toDataURL (CRITICAL LATENCY FIX)
+      // toDataURL is synchronous and blocks UI for 10-50ms per frame!
+      // toBlob is async and sends binary directly (no base64 = 33% smaller)
+      lastFrameSentTimeRef.current = now;  // Update throttle timestamp
+
+      canvas.toBlob(async (blob) => {
+        if (!blob) return;
+
+        // Prefer WebRTC DataChannel (UDP, lower latency) over WebSocket (TCP)
+        if (webrtcReadyRef.current && dcRef.current?.readyState === 'open') {
+          try {
+            const arrayBuffer = await blob.arrayBuffer();
+            dcRef.current.send(arrayBuffer);
+            // console.log('[WebRTC] Frame sent via DataChannel');
+          } catch (err) {
+            console.warn('[WebRTC] DataChannel send failed, falling back to WebSocket');
+            webrtcReadyRef.current = false;
+          }
+        } else if (wsRef.current?.readyState === WebSocket.OPEN) {
+          // Fallback to WebSocket
+          if (wsRef.current.bufferedAmount < 256 * 1024) {
+            wsRef.current.send(blob);
+          }
+        }
+      }, 'image/jpeg', 0.5);  // 0.5 quality for even faster transmission
     }
 
     animationRef.current = requestAnimationFrame(runDetectionLoop);
@@ -1459,6 +1632,50 @@ export default function LivePage() {
     };
   }, []);
 
+  // Handle video pause/play events to preserve violence meter (GAP-001 fix)
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const handlePause = () => {
+      if (isActive) {
+        setStatus('paused');
+        // Preserve current violence reading
+        lastViolenceRef.current = currentViolence;
+        console.log('[Video] Paused - preserving violence:', currentViolence);
+      }
+    };
+
+    const handlePlay = () => {
+      if (isActive) {
+        setStatus('active');
+        // Restore violence reading if we had one
+        if (lastViolenceRef.current > 0 && currentViolence === 0) {
+          setCurrentViolence(lastViolenceRef.current);
+        }
+        console.log('[Video] Playing');
+      }
+    };
+
+    const handleEnded = () => {
+      console.log('[Video] Ended');
+      if (uploadedFile) {
+        setStatus('paused');
+        // Keep violence meter at last value
+      }
+    };
+
+    video.addEventListener('pause', handlePause);
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('ended', handleEnded);
+
+    return () => {
+      video.removeEventListener('pause', handlePause);
+      video.removeEventListener('play', handlePlay);
+      video.removeEventListener('ended', handleEnded);
+    };
+  }, [isActive, currentViolence, uploadedFile]);
+
   useEffect(() => {
     if (isActive) {
       runDetectionLoop();
@@ -1900,7 +2117,7 @@ export default function LivePage() {
                             ? 'False positive filtered by VETO model'
                             : vetoStatus === 'PRIMARY_FAST'
                             ? 'Low confidence - no VETO check needed'
-                            : `VETO confirmed: ${(vetoScore ?? 0 * 100).toFixed(1)}%`}
+                            : `VETO confirmed: ${((vetoScore ?? 0) * 100).toFixed(1)}%`}
                         </p>
                       </div>
                     </div>

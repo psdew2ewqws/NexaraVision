@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
 🆔 *رقم الحادثة:* ${alert.incidentId.slice(0, 8)}
 
 🔗 *عرض التفاصيل:*
-https://nexara-vision.vercel.app/alerts
+https://nexaravision.com/alerts
 
 يرجى المراجعة فوراً.`;
 
