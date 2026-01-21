@@ -293,6 +293,7 @@ export default function LivePage() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
+  const processedFrameCanvasRef = useRef<HTMLCanvasElement>(null);  // For server-processed frames with skeleton
   const streamRef = useRef<MediaStream | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -570,11 +571,22 @@ export default function LivePage() {
                 buffer_size: data.buffer,
               });
 
-              // Draw YOLOv26 skeletons from smart_veto response
-              if (data.skeletons && data.skeletons.length > 0) {
+              // Display processed frame with skeleton (perfect sync - skeleton drawn server-side)
+              if (data.processed_frame) {
+                displayProcessedFrame(data.processed_frame);
+                // Clear overlay canvas since skeleton is in processed frame
+                const overlay = overlayCanvasRef.current;
+                if (overlay) {
+                  const ctx = overlay.getContext('2d');
+                  if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+                }
+              } else if (data.skeletons && data.skeletons.length > 0) {
+                // Fallback: draw skeletons client-side (has latency)
+                clearProcessedFrame();
                 drawServerSkeletons(data.skeletons);
               } else {
-                // Clear overlay if no skeletons
+                // Clear both canvases if no skeleton data
+                clearProcessedFrame();
                 const overlay = overlayCanvasRef.current;
                 if (overlay) {
                   const ctx = overlay.getContext('2d');
@@ -959,6 +971,39 @@ export default function LivePage() {
         }
       });
     });
+  };
+
+  // Display processed frame from server (with skeleton already drawn) for perfect sync
+  const displayProcessedFrame = (base64Data: string) => {
+    const canvas = processedFrameCanvasRef.current;
+    const video = videoRef.current;
+    if (!canvas || !video) return;
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Create image from base64
+    const img = new Image();
+    img.onload = () => {
+      // Match canvas to video display size
+      const displayWidth = video.clientWidth || video.videoWidth || 640;
+      const displayHeight = video.clientHeight || video.videoHeight || 480;
+      canvas.width = displayWidth;
+      canvas.height = displayHeight;
+
+      // Draw the processed frame (which has skeleton already drawn by server)
+      ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+    };
+    img.src = `data:image/jpeg;base64,${base64Data}`;
+  };
+
+  // Clear the processed frame canvas
+  const clearProcessedFrame = () => {
+    const canvas = processedFrameCanvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
   };
 
   // Draw YOLO v26 skeletons from v39 server response (COCO 17-keypoint format)
@@ -1370,6 +1415,9 @@ export default function LivePage() {
       videoRef.current.src = '';
     }
 
+    // Clear processed frame canvas
+    clearProcessedFrame();
+
     setActiveCamera(null);
     activeCameraRef.current = null;
     defaultLocationRef.current = null;
@@ -1706,6 +1754,9 @@ export default function LivePage() {
 
                 {/* Overlay for pose drawing */}
                 <canvas ref={overlayCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
+
+                {/* Processed frame canvas (server-rendered skeleton for perfect sync) */}
+                <canvas ref={processedFrameCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
 
                 {/* Violence Indicator Overlay */}
                 <AnimatePresence>
