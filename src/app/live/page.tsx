@@ -569,6 +569,18 @@ export default function LivePage() {
                 t_total: data.inference_ms,
                 buffer_size: data.buffer,
               });
+
+              // Draw YOLOv26 skeletons from smart_veto response
+              if (data.skeletons && data.skeletons.length > 0) {
+                drawServerSkeletons(data.skeletons);
+              } else {
+                // Clear overlay if no skeletons
+                const overlay = overlayCanvasRef.current;
+                if (overlay) {
+                  const ctx = overlay.getContext('2d');
+                  if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+                }
+              }
               return;
             }
 
