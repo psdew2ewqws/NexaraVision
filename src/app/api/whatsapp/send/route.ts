@@ -17,10 +17,14 @@ interface IncidentAlertRequest {
 }
 
 function formatPhoneNumber(phone: string): string {
+  // Remove all non-digit characters except +
   let cleaned = phone.replace(/[^\d+]/g, '');
+  // Remove the + prefix
   if (cleaned.startsWith('+')) {
     cleaned = cleaned.substring(1);
   }
+  // Remove leading zeros (common mistake: +062 instead of +62)
+  cleaned = cleaned.replace(/^0+/, '');
   return cleaned;
 }
 

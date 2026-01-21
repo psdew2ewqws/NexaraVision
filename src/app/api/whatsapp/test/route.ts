@@ -3,10 +3,15 @@ import { NextRequest, NextResponse } from 'next/server';
 const WHATSAPP_API_URL = 'https://api.4whats.net';
 
 function formatPhoneNumber(phone: string): string {
+  // Remove all non-digit characters except +
   let cleaned = phone.replace(/[^\d+]/g, '');
+  // Remove the + prefix
   if (cleaned.startsWith('+')) {
     cleaned = cleaned.substring(1);
   }
+  // Remove leading zeros (common mistake: +062 instead of +62)
+  cleaned = cleaned.replace(/^0+/, '');
+  console.log('[WhatsApp] Phone formatted:', phone, '->', cleaned);
   return cleaned;
 }
 

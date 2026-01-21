@@ -270,6 +270,7 @@ export default function SettingsPage() {
     settings: alertSettings,
     loading: alertLoading,
     saving: alertSaving,
+    error: alertError,
     updateSettings: updateAlertSettings,
     testWhatsApp,
   } = useAlertSettings(user?.id);
@@ -287,13 +288,20 @@ export default function SettingsPage() {
   }, [alertSettings?.whatsapp_number]);
 
   const handleWhatsAppToggle = async (enabled: boolean) => {
+    console.log('[Settings] WhatsApp toggle clicked, enabled:', enabled, 'phone:', whatsappPhone);
+    if (!user) {
+      console.log('[Settings] No user, cannot toggle WhatsApp');
+      return;
+    }
     if (enabled && !whatsappPhone) {
+      console.log('[Settings] Cannot enable without phone number');
       return; // Don't enable without a phone number
     }
-    await updateAlertSettings({
+    const result = await updateAlertSettings({
       whatsapp_enabled: enabled,
       whatsapp_number: enabled ? whatsappPhone : alertSettings?.whatsapp_number,
     });
+    console.log('[Settings] WhatsApp toggle result:', result);
   };
 
   const handleWhatsAppSave = async () => {
@@ -323,7 +331,13 @@ export default function SettingsPage() {
   };
 
   const handleMinConfidenceChange = async (value: number) => {
-    await updateAlertSettings({ min_confidence: value / 100 });
+    console.log('[Settings] Min confidence changed to:', value);
+    if (!user) {
+      console.log('[Settings] No user, cannot update confidence');
+      return;
+    }
+    const result = await updateAlertSettings({ min_confidence: value / 100 });
+    console.log('[Settings] Min confidence update result:', result);
   };
 
   const handleSave = async () => {
@@ -541,6 +555,22 @@ export default function SettingsPage() {
           description={t.whatsapp.description}
         >
           <div className="space-y-4">
+            {/* Show login requirement */}
+            {!user && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-3">
+                <p className="text-sm text-amber-400">
+                  {locale === 'ar' ? 'يرجى تسجيل الدخول لاستخدام إشعارات واتساب' : 'Please sign in to use WhatsApp notifications'}
+                </p>
+              </div>
+            )}
+
+            {/* Show error if any */}
+            {alertError && (
+              <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3">
+                <p className="text-sm text-red-400">{alertError}</p>
+              </div>
+            )}
+
             <ToggleSetting
               label={t.whatsapp.enable}
               description={t.whatsapp.enableDesc + (!whatsappPhone ? ' (Enter phone number first)' : '')}

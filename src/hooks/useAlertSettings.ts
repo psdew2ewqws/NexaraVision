@@ -6,6 +6,21 @@ import { AlertSettings } from '@/types/database';
 
 const supabase = getSupabase();
 
+// Default settings for new users
+const DEFAULT_ALERT_SETTINGS: Omit<AlertSettings, 'id' | 'user_id' | 'created_at' | 'updated_at'> = {
+  whatsapp_enabled: false,
+  whatsapp_number: null,
+  telegram_enabled: false,
+  telegram_chat_id: null,
+  discord_enabled: false,
+  discord_webhook_url: null,
+  email_enabled: false,
+  push_enabled: true,
+  min_confidence: 0.7,
+  quiet_hours_start: null,
+  quiet_hours_end: null,
+};
+
 export function useAlertSettings(userId: string | undefined) {
   const [settings, setSettings] = useState<AlertSettings | null>(null);
   const [loading, setLoading] = useState(true);
@@ -14,6 +29,7 @@ export function useAlertSettings(userId: string | undefined) {
 
   const fetchSettings = useCallback(async () => {
     if (!userId) {
+      console.log('[AlertSettings] No userId, skipping fetch');
       setLoading(false);
       return;
     }
@@ -21,6 +37,7 @@ export function useAlertSettings(userId: string | undefined) {
     try {
       setLoading(true);
       setError(null);
+      console.log('[AlertSettings] Fetching settings for user:', userId);
 
       const { data, error: fetchError } = await supabase
         .from('alert_settings')
@@ -29,21 +46,14 @@ export function useAlertSettings(userId: string | undefined) {
         .single();
 
       if (fetchError) {
+        console.log('[AlertSettings] Fetch error code:', fetchError.code, fetchError.message);
+
         // If no settings exist, create default settings
         if (fetchError.code === 'PGRST116') {
-          const defaultSettings: Partial<AlertSettings> = {
+          console.log('[AlertSettings] No settings found, creating defaults...');
+          const defaultSettings = {
             user_id: userId,
-            whatsapp_enabled: false,
-            whatsapp_number: null,
-            telegram_enabled: false,
-            telegram_chat_id: null,
-            discord_enabled: false,
-            discord_webhook_url: null,
-            email_enabled: false,
-            push_enabled: true,
-            min_confidence: 0.7,
-            quiet_hours_start: null,
-            quiet_hours_end: null,
+            ...DEFAULT_ALERT_SETTINGS,
           };
 
           const { data: newData, error: insertError } = await supabase
@@ -54,19 +64,47 @@ export function useAlertSettings(userId: string | undefined) {
 
           if (insertError) {
             console.error('[AlertSettings] Failed to create defaults:', insertError);
-            setError('Failed to create alert settings');
+            // Still set local defaults so UI works
+            setSettings({
+              id: 'local-fallback',
+              user_id: userId,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              ...DEFAULT_ALERT_SETTINGS,
+            } as AlertSettings);
+            setError('Settings saved locally (DB sync failed)');
           } else {
+            console.log('[AlertSettings] Created default settings:', newData);
             setSettings(newData);
           }
         } else {
           console.error('[AlertSettings] Fetch error:', fetchError);
-          setError('Failed to load alert settings');
+          // Set local defaults so UI still works
+          setSettings({
+            id: 'local-fallback',
+            user_id: userId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            ...DEFAULT_ALERT_SETTINGS,
+          } as AlertSettings);
+          setError('Using local settings (DB unavailable)');
         }
       } else {
+        console.log('[AlertSettings] Loaded settings:', data);
         setSettings(data);
       }
     } catch (err) {
       console.error('[AlertSettings] Error:', err);
+      // Set local defaults so UI still works
+      if (userId) {
+        setSettings({
+          id: 'local-fallback',
+          user_id: userId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          ...DEFAULT_ALERT_SETTINGS,
+        } as AlertSettings);
+      }
       setError('An unexpected error occurred');
     } finally {
       setLoading(false);
@@ -78,27 +116,40 @@ export function useAlertSettings(userId: string | undefined) {
   }, [fetchSettings]);
 
   const updateSettings = async (updates: Partial<AlertSettings>): Promise<boolean> => {
-    if (!userId || !settings) return false;
+    if (!userId) {
+      console.log('[AlertSettings] No userId, cannot update');
+      return false;
+    }
+
+    // Optimistically update local state immediately
+    setSettings(prev => prev ? { ...prev, ...updates } : null);
 
     try {
       setSaving(true);
       setError(null);
+      console.log('[AlertSettings] Updating settings:', updates);
 
-      const { data, error: updateError } = await supabase
+      // Use upsert to handle both insert and update cases
+      const { data, error: upsertError } = await supabase
         .from('alert_settings')
-        .update({ ...updates, updated_at: new Date().toISOString() })
-        .eq('user_id', userId)
+        .upsert({
+          user_id: userId,
+          ...updates,
+          updated_at: new Date().toISOString(),
+        }, {
+          onConflict: 'user_id',
+        })
         .select()
         .single();
 
-      if (updateError) {
-        console.error('[AlertSettings] Update error:', updateError);
+      if (upsertError) {
+        console.error('[AlertSettings] Upsert error:', upsertError);
         setError('Failed to save settings');
         return false;
       }
 
       setSettings(data);
-      console.log('[AlertSettings] Settings updated successfully');
+      console.log('[AlertSettings] Settings updated successfully:', data);
       return true;
     } catch (err) {
       console.error('[AlertSettings] Error:', err);
