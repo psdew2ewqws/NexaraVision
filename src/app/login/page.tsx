@@ -64,13 +64,20 @@ function LoginForm() {
     setError(null);
 
     const supabase = getSupabase();
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) {
       setError(error.message);
+      setLoading(false);
+    } else if (data.user && !data.user.email_confirmed_at) {
+      // Email not confirmed - sign out and show error
+      await supabase.auth.signOut();
+      setError(locale === 'ar'
+        ? 'يرجى تأكيد بريدك الإلكتروني قبل تسجيل الدخول. تحقق من صندوق الوارد الخاص بك.'
+        : 'Please confirm your email address before logging in. Check your inbox for the confirmation link.');
       setLoading(false);
     } else {
       router.push(redirect);
