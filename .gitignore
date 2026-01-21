@@ -18,3 +18,4 @@ npm-debug.log*
 
 # Videos
 public/videos/
+.env*.local

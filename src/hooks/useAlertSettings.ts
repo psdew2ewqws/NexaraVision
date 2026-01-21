@@ -118,6 +118,7 @@ export function useAlertSettings(userId: string | undefined) {
   const updateSettings = async (updates: Partial<AlertSettings>): Promise<boolean> => {
     if (!userId) {
       console.log('[AlertSettings] No userId, cannot update');
+      setError('Please sign in to save settings');
       return false;
     }
 
@@ -127,6 +128,19 @@ export function useAlertSettings(userId: string | undefined) {
     try {
       setSaving(true);
       setError(null);
+
+      // Check auth status
+      const { data: { session } } = await supabase.auth.getSession();
+      console.log('[AlertSettings] Session check:', session ? 'authenticated' : 'NOT authenticated');
+      console.log('[AlertSettings] User ID:', userId);
+      console.log('[AlertSettings] Session user ID:', session?.user?.id);
+
+      if (!session) {
+        console.error('[AlertSettings] No active session!');
+        setError('Session expired - please sign in again');
+        return false;
+      }
+
       console.log('[AlertSettings] Updating settings:', updates);
 
       // Use upsert to handle both insert and update cases
@@ -143,8 +157,8 @@ export function useAlertSettings(userId: string | undefined) {
         .single();
 
       if (upsertError) {
-        console.error('[AlertSettings] Upsert error:', upsertError);
-        setError('Failed to save settings');
+        console.error('[AlertSettings] Upsert error:', upsertError.message, upsertError.code, upsertError.details);
+        setError(`Failed to save: ${upsertError.message}`);
         return false;
       }
 
