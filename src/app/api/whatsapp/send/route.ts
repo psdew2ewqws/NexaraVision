@@ -58,16 +58,19 @@ export async function POST(request: NextRequest) {
       });
       const confidencePercent = Math.round(alert.confidence * 100);
 
-      message = `🚨 *VIOLENCE ALERT* 🚨
+      message = `🚨 *تنبيه عنف* 🚨
 
-⚠️ Violence detected at *${alert.locationName}*
+⚠️ تم اكتشاف عنف في *${alert.locationName}*
 
-📍 *Camera:* ${alert.cameraName}
-📊 *Confidence:* ${confidencePercent}%
-🕐 *Time:* ${timestamp}
-🆔 *Incident ID:* ${alert.incidentId.slice(0, 8)}
+📍 *الكاميرا:* ${alert.cameraName}
+📊 *نسبة الثقة:* ${confidencePercent}%
+🕐 *الوقت:* ${timestamp}
+🆔 *رقم الحادثة:* ${alert.incidentId.slice(0, 8)}
 
-Please review immediately in the NexaraVision dashboard.`;
+🔗 *عرض التفاصيل:*
+https://nexara-vision.vercel.app/alerts
+
+يرجى المراجعة فوراً.`;
     } else {
       // Simple message
       const msg = body as SendMessageRequest;

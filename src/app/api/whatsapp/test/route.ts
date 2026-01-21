@@ -46,13 +46,16 @@ export async function POST(request: NextRequest) {
 
     const formattedPhone = formatPhoneNumber(phone);
 
-    const message = `✅ *NexaraVision WhatsApp Test*
+    const message = `✅ *اختبار NexaraVision واتساب*
 
-Your WhatsApp alerts are configured correctly!
+تم تكوين تنبيهات واتساب بنجاح!
 
-You will receive notifications when violence is detected by your surveillance system.
+ستتلقى إشعارات عند اكتشاف العنف بواسطة نظام المراقبة.
 
-🔒 This number is now linked to your account.`;
+🔗 *رابط التنبيهات:*
+https://nexara-vision.vercel.app/alerts
+
+🔒 تم ربط هذا الرقم بحسابك.`;
 
     const params = new URLSearchParams({
       instanceid: instanceId,
