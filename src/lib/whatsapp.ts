@@ -126,9 +126,11 @@ export async function sendViolenceAlert(
   const timestamp = alert.timestamp.toLocaleString('en-US', {
     dateStyle: 'medium',
     timeStyle: 'short',
+    timeZone: 'Asia/Amman',  // Jordan timezone
   });
 
-  const confidencePercent = Math.round(alert.confidence * 100);
+  // confidence is already 0-100, no need to multiply
+  const confidencePercent = Math.round(alert.confidence);
 
   const message = `🚨 *VIOLENCE ALERT* 🚨
 
