@@ -720,9 +720,10 @@ export default function LivePage() {
         ws.onopen = () => {
           setStatus('active');
 
-          // Send current config to server on connection
+          // Send current config to server on connection, including userId for per-user model config
           const configMessage = {
             type: 'config',
+            userId: userRef.current?.id,  // For per-user model threshold configuration
             settings: {
               primary_threshold: detectionSettings.primary_threshold,
               veto_threshold: detectionSettings.veto_threshold,
