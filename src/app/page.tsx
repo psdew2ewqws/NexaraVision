@@ -5,6 +5,7 @@ import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/lib/utils';
 import { useDashboardStats, useIncidents, useCameras } from '@/hooks/useSupabase';
 import { useProfiles } from '@/hooks/useProfiles';
+import { Skeleton } from '@/components/ui/Skeleton';
 import Link from 'next/link';
 
 // Vast.ai WebSocket URL
@@ -247,33 +248,43 @@ export default function Dashboard() {
           {/* Today's Incidents */}
           <div className="bg-slate-900/50 border border-white/[0.06] rounded-xl p-4">
             <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">{text.todayIncidents}</p>
-            <p className="text-3xl font-semibold text-white">
-              {statsLoading ? '—' : stats.todaysIncidents}
-            </p>
+            {statsLoading ? (
+              <Skeleton className="h-9 w-16 mb-2" />
+            ) : (
+              <p className="text-3xl font-semibold text-white">{stats.todaysIncidents}</p>
+            )}
             <div className="mt-2 flex items-center gap-2">
-              <span className="text-xs text-green-400">{stats.resolvedToday} {text.resolved.toLowerCase()}</span>
+              {statsLoading ? (
+                <Skeleton className="h-4 w-24" />
+              ) : (
+                <span className="text-xs text-green-400">{stats.resolvedToday} {text.resolved.toLowerCase()}</span>
+              )}
             </div>
           </div>
 
           {/* Last Violence */}
           <div className="bg-slate-900/50 border border-white/[0.06] rounded-xl p-4">
             <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">{text.lastViolence}</p>
-            <p className="text-xl font-semibold text-white">
-              {formatRelativeTime(lastViolenceTime)}
-            </p>
-            {lastViolence && (
-              <p className="text-xs text-slate-500 mt-2">
-                {lastViolence.confidence}% {text.confidence}
-              </p>
+            {incidentsLoading ? (
+              <Skeleton className="h-7 w-20 mb-2" />
+            ) : (
+              <p className="text-xl font-semibold text-white">{formatRelativeTime(lastViolenceTime)}</p>
             )}
+            {incidentsLoading ? (
+              <Skeleton className="h-4 w-16 mt-2" />
+            ) : lastViolence ? (
+              <p className="text-xs text-slate-500 mt-2">{lastViolence.confidence}% {text.confidence}</p>
+            ) : null}
           </div>
 
           {/* Cameras Online */}
           <div className="bg-slate-900/50 border border-white/[0.06] rounded-xl p-4">
             <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">{text.cameraStatus}</p>
-            <p className="text-3xl font-semibold text-white">
-              {camerasLoading ? '—' : `${onlineCameras}/${cameras.length}`}
-            </p>
+            {camerasLoading ? (
+              <Skeleton className="h-9 w-16 mb-2" />
+            ) : (
+              <p className="text-3xl font-semibold text-white">{onlineCameras}/{cameras.length}</p>
+            )}
             <div className="mt-2 flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-green-500"></span>
               <span className="text-xs text-slate-400">{text.camerasOnline}</span>
@@ -283,9 +294,11 @@ export default function Dashboard() {
           {/* Avg Response */}
           <div className="bg-slate-900/50 border border-white/[0.06] rounded-xl p-4">
             <p className="text-slate-500 text-xs uppercase tracking-wide mb-1">{text.avgResponse}</p>
-            <p className="text-3xl font-semibold text-white">
-              {statsLoading ? '—' : `${stats.avgResponseTime || 2}m`}
-            </p>
+            {statsLoading ? (
+              <Skeleton className="h-9 w-12 mb-2" />
+            ) : (
+              <p className="text-3xl font-semibold text-white">{stats.avgResponseTime || 2}m</p>
+            )}
             <div className="mt-2">
               <span className={cn(
                 "text-xs",
@@ -393,7 +406,21 @@ export default function Dashboard() {
               </div>
               <div className="divide-y divide-white/[0.04]">
                 {incidentsLoading ? (
-                  <div className="p-8 text-center text-slate-500 text-sm">Loading...</div>
+                  <div className="divide-y divide-white/[0.04]">
+                    {[1, 2, 3].map((i) => (
+                      <div key={i} className="p-3 sm:p-4 flex items-center gap-3 sm:gap-4">
+                        <Skeleton variant="circular" width={8} height={8} />
+                        <div className="flex-1 min-w-0">
+                          <Skeleton variant="text" className="w-32 mb-1" />
+                          <Skeleton variant="text" className="w-20 h-3" />
+                        </div>
+                        <div className="text-right">
+                          <Skeleton variant="text" className="w-16 mb-1" />
+                          <Skeleton variant="text" className="w-12 h-3" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : incidents.length === 0 ? (
                   <div className="p-8 text-center">
                     <p className="text-slate-400 text-sm">{text.noIncidents}</p>
@@ -436,9 +463,11 @@ export default function Dashboard() {
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-slate-400">{text.totalUsers}</span>
-                  <span className="text-sm font-medium text-white">
-                    {usersLoading ? '—' : userStats.total}
-                  </span>
+                  {usersLoading ? (
+                    <Skeleton className="h-4 w-8" />
+                  ) : (
+                    <span className="text-sm font-medium text-white">{userStats.total}</span>
+                  )}
                 </div>
                 <div className="h-px bg-white/[0.06]"></div>
                 <div className="flex items-center justify-between">
@@ -446,21 +475,33 @@ export default function Dashboard() {
                     <span className="w-2 h-2 rounded-full bg-purple-500"></span>
                     <span className="text-sm text-slate-400">{text.admins}</span>
                   </div>
-                  <span className="text-sm text-white">{usersLoading ? '—' : userStats.admins}</span>
+                  {usersLoading ? (
+                    <Skeleton className="h-4 w-6" />
+                  ) : (
+                    <span className="text-sm text-white">{userStats.admins}</span>
+                  )}
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-blue-500"></span>
                     <span className="text-sm text-slate-400">{text.managers}</span>
                   </div>
-                  <span className="text-sm text-white">{usersLoading ? '—' : userStats.managers}</span>
+                  {usersLoading ? (
+                    <Skeleton className="h-4 w-6" />
+                  ) : (
+                    <span className="text-sm text-white">{userStats.managers}</span>
+                  )}
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                     <span className="text-sm text-slate-400">{text.guards}</span>
                   </div>
-                  <span className="text-sm text-white">{usersLoading ? '—' : userStats.guards}</span>
+                  {usersLoading ? (
+                    <Skeleton className="h-4 w-6" />
+                  ) : (
+                    <span className="text-sm text-white">{userStats.guards}</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -469,7 +510,17 @@ export default function Dashboard() {
             <div className="bg-slate-900/50 border border-white/[0.06] rounded-xl p-3 sm:p-5">
               <h2 className="text-sm font-medium text-white mb-4">{text.cameraStatus}</h2>
               {camerasLoading ? (
-                <p className="text-sm text-slate-500">Loading...</p>
+                <div className="space-y-3">
+                  {[1, 2, 3, 4].map((i) => (
+                    <div key={i} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Skeleton variant="circular" width={8} height={8} />
+                        <Skeleton className="h-4 w-16" />
+                      </div>
+                      <Skeleton className="h-4 w-6" />
+                    </div>
+                  ))}
+                </div>
               ) : cameras.length === 0 ? (
                 <p className="text-sm text-slate-500">No cameras configured</p>
               ) : (
