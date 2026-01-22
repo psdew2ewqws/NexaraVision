@@ -55,6 +55,9 @@ function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const redirect = searchParams.get('redirect') || '/';
+  const confirmed = searchParams.get('confirmed') === 'true';
+  const errorParam = searchParams.get('error');
+  const errorMessage = searchParams.get('message');
   const { locale, isRTL } = useLanguage();
   const t = translations[locale as 'en' | 'ar'] || translations.en;
 
@@ -101,6 +104,23 @@ function LoginForm() {
 
           <TextureCardContent>
             <form onSubmit={handleLogin} className="space-y-4">
+              {/* Success message for email confirmation */}
+              {confirmed && (
+                <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/20 text-green-400 text-sm">
+                  {locale === 'ar'
+                    ? 'تم تأكيد بريدك الإلكتروني بنجاح! يمكنك الآن تسجيل الدخول.'
+                    : 'Your email has been confirmed! You can now sign in.'}
+                </div>
+              )}
+
+              {/* Error from URL params (e.g., confirmation failed) */}
+              {errorParam && (
+                <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+                  {errorMessage || (locale === 'ar' ? 'حدث خطأ' : 'An error occurred')}
+                </div>
+              )}
+
+              {/* Form validation errors */}
               {error && (
                 <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
                   {error}
