@@ -57,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [supabase]);
 
   // Refresh profile (can be called externally)
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization -- user?.id is correct narrow dependency
   const refreshProfile = useCallback(async () => {
     if (user?.id) {
       await fetchProfile(user.id);
