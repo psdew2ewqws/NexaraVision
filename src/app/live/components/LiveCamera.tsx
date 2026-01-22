@@ -559,6 +559,39 @@ export function LiveCamera() {
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    // De-duplicate skeletons that are too close (same person detected twice)
+    const DEDUP_THRESHOLD = 80;
+    const dedupedSkeletons = skeletons.filter((skeleton, index) => {
+      let sumX = 0, sumY = 0, count = 0;
+      skeleton.forEach(kp => {
+        if (kp && kp.length >= 3 && kp[2] > 0.3) {
+          sumX += kp[0];
+          sumY += kp[1];
+          count++;
+        }
+      });
+      if (count === 0) return true;
+      const centerX = sumX / count;
+      const centerY = sumY / count;
+      for (let i = 0; i < index; i++) {
+        let sumX2 = 0, sumY2 = 0, count2 = 0;
+        skeletons[i].forEach(kp => {
+          if (kp && kp.length >= 3 && kp[2] > 0.3) {
+            sumX2 += kp[0];
+            sumY2 += kp[1];
+            count2++;
+          }
+        });
+        if (count2 > 0) {
+          const centerX2 = sumX2 / count2;
+          const centerY2 = sumY2 / count2;
+          const distance = Math.sqrt((centerX - centerX2) ** 2 + (centerY - centerY2) ** 2);
+          if (distance < DEDUP_THRESHOLD) return false;
+        }
+      }
+      return true;
+    });
+
     // COCO 17-keypoint skeleton connections
     const connections = [
       [0, 1], [0, 2], [1, 3], [2, 4],  // Head
@@ -569,7 +602,7 @@ export function LiveCamera() {
 
     const colors = ['#00ff00', '#ff6600', '#00ffff', '#ff00ff', '#ffff00'];
 
-    skeletons.forEach((skeleton, poseIndex) => {
+    dedupedSkeletons.forEach((skeleton, poseIndex) => {
       const color = colors[poseIndex % colors.length];
 
       // Draw connections
