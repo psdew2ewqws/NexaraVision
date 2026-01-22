@@ -9,6 +9,7 @@ out/
 .env
 .env.local
 .env.production.local
+.env*.local
 
 # Debug
 npm-debug.log*
@@ -18,5 +19,34 @@ npm-debug.log*
 
 # Videos
 public/videos/
-.env*.local
+
+# Claude
 .claude/ralph-loop.local.md
+
+# Python
+__pycache__/
+*.pyc
+venv/
+venv*/
+*.egg-info/
+
+# Large files and models
+downloaded_models/
+*.pth
+*.onnx
+
+# Experimental/prototype directories
+ml_service/venv*/
+web_prototype/venv/
+web_app_backend/
+web_app_nextjs/
+nexara_backend/
+violence_detection_mvp/
+grid_detection/
+
+# Playwright
+.playwright-mcp/
+
+# Misc
+*.log
+.DS_Store

@@ -46,6 +46,7 @@ interface UseModelConfigurationResult {
   isLoading: boolean;
   isSaving: boolean;
   error: string | null;
+  saveSuccess: boolean;
   isAuthenticated: boolean;
 
   // Model info
@@ -70,6 +71,7 @@ export function useModelConfiguration(): UseModelConfigurationResult {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
 
   // Get model specifications
@@ -241,6 +243,7 @@ export function useModelConfiguration(): UseModelConfigurationResult {
   const saveConfig = useCallback(async (): Promise<boolean> => {
     setIsSaving(true);
     setError(null);
+    setSaveSuccess(false);
 
     try {
       // Validate before saving
@@ -250,21 +253,30 @@ export function useModelConfiguration(): UseModelConfigurationResult {
         return false;
       }
 
+      let success = false;
       if (userId) {
-        const success = await saveToSupabase(userId, config);
+        success = await saveToSupabase(userId, config);
         if (!success) {
           saveToLocalStorage(config);
+          // Still consider it a success for the user (saved locally)
+          success = true;
         }
-        return true;
       } else {
         saveToLocalStorage(config);
-        return true;
+        success = true;
       }
+
+      if (success) {
+        setSaveSuccess(true);
+        // Auto-clear success after 3 seconds
+        setTimeout(() => setSaveSuccess(false), 3000);
+      }
+      return success;
     } catch (err) {
       log.error('[Model Config] Error saving:', err);
       setError('Failed to save model configuration');
       saveToLocalStorage(config);
-      return true;
+      return false;
     } finally {
       setIsSaving(false);
     }
@@ -279,6 +291,7 @@ export function useModelConfiguration(): UseModelConfigurationResult {
     isLoading,
     isSaving,
     error,
+    saveSuccess,
     isAuthenticated: !!userId,
     primaryModelSpec,
     vetoModelSpec,

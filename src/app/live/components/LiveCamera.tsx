@@ -139,6 +139,14 @@ export function LiveCamera() {
   const [detectionMode, setDetectionMode] = useState<DetectionMode>('vastai-realtime');
   const [wsConnected, setWsConnected] = useState(false);
   const [wsLatency, setWsLatency] = useState(0);
+
+  // Smart Veto model configuration (dynamic from ML service)
+  const [smartVetoConfig, setSmartVetoConfig] = useState<{
+    primary: { model: string; threshold: number };
+    veto: { model: string; threshold: number };
+    logic: string;
+    stats?: { violence_alerts: number; vetoed: number; safe: number };
+  } | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [violenceProb, setViolenceProb] = useState(0);
@@ -165,8 +173,8 @@ export function LiveCamera() {
   const analysisHistory = useRef<number[]>([]);
   const inferenceHistory = useRef<number[]>([]);
 
-  const ML_SERVICE_URL = process.env.NEXT_PUBLIC_ML_SERVICE_URL || 'http://localhost:8003/api';
-  const VASTAI_WS_URL = process.env.NEXT_PUBLIC_VASTAI_WS_URL || 'ws://136.59.129.136:34788/ws';
+  const ML_SERVICE_URL = process.env.NEXT_PUBLIC_ML_SERVICE_URL || 'http://79.160.189.79:14082';
+  const VASTAI_WS_URL = process.env.NEXT_PUBLIC_VASTAI_WS_URL || 'ws://79.160.189.79:14082/ws/live';
 
   const t = {
     liveCameraFeed: locale === 'ar' ? 'بث الكاميرا المباشر' : 'Live Camera Feed',
@@ -926,6 +934,27 @@ export function LiveCamera() {
     };
   }, []);
 
+  // Fetch Smart Veto config from ML service
+  useEffect(() => {
+    const fetchSmartVetoConfig = async () => {
+      try {
+        const response = await fetch(`${ML_SERVICE_URL}/config`);
+        if (response.ok) {
+          const config = await response.json();
+          setSmartVetoConfig(config);
+          vastaiLog.debug('[Smart Veto] Config loaded:', config);
+        }
+      } catch (err) {
+        vastaiLog.error('[Smart Veto] Failed to fetch config:', err);
+      }
+    };
+
+    fetchSmartVetoConfig();
+    // Refresh config every 30 seconds
+    const interval = setInterval(fetchSmartVetoConfig, 30000);
+    return () => clearInterval(interval);
+  }, [ML_SERVICE_URL]);
+
   const violenceDetected = violenceProb > 50;
 
   const formatDuration = (seconds: number) => {
@@ -1245,6 +1274,84 @@ export function LiveCamera() {
           </div>
         </TextureCardContent>
       </TextureCardStyled>
+
+      {/* Smart Veto Model Configuration */}
+      {smartVetoConfig && detectionMode === 'vastai-realtime' && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <TextureCardStyled>
+            <TextureCardHeader>
+              <TextureCardTitle className={cn("flex items-center gap-2", isRTL && "flex-row-reverse")}>
+                <Brain className="h-5 w-5 text-purple-400" />
+                {locale === 'ar' ? 'نظام Smart Veto Ensemble' : 'Smart Veto Ensemble'}
+              </TextureCardTitle>
+            </TextureCardHeader>
+            <TextureSeparator />
+            <TextureCardContent className="pt-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Primary Model */}
+                <div className="bg-blue-500/10 border border-blue-500/30 rounded-xl p-4">
+                  <div className={cn("flex items-center gap-2 mb-2", isRTL && "flex-row-reverse")}>
+                    <Shield className="h-4 w-4 text-blue-400" />
+                    <span className="text-sm font-medium text-blue-400">
+                      {locale === 'ar' ? 'النموذج الأساسي' : 'PRIMARY Model'}
+                    </span>
+                  </div>
+                  <div className="text-lg font-bold text-white mb-1">
+                    {smartVetoConfig.primary.model}
+                  </div>
+                  <div className="text-sm text-slate-400">
+                    {locale === 'ar' ? 'الحد الأدنى' : 'Threshold'}: ≥{smartVetoConfig.primary.threshold}%
+                  </div>
+                </div>
+                {/* Veto Model */}
+                <div className="bg-orange-500/10 border border-orange-500/30 rounded-xl p-4">
+                  <div className={cn("flex items-center gap-2 mb-2", isRTL && "flex-row-reverse")}>
+                    <AlertTriangle className="h-4 w-4 text-orange-400" />
+                    <span className="text-sm font-medium text-orange-400">
+                      {locale === 'ar' ? 'نموذج الفيتو' : 'VETO Model'}
+                    </span>
+                  </div>
+                  <div className="text-lg font-bold text-white mb-1">
+                    {smartVetoConfig.veto.model}
+                  </div>
+                  <div className="text-sm text-slate-400">
+                    {locale === 'ar' ? 'الحد الأدنى' : 'Threshold'}: ≥{smartVetoConfig.veto.threshold}%
+                  </div>
+                </div>
+              </div>
+              {/* Detection Logic */}
+              <div className="mt-4 p-3 bg-slate-800/50 rounded-lg border border-slate-700">
+                <div className={cn("flex items-center gap-2 text-sm", isRTL && "flex-row-reverse")}>
+                  <Cpu className="h-4 w-4 text-green-400" />
+                  <span className="text-slate-300 font-mono text-xs">
+                    {smartVetoConfig.logic}
+                  </span>
+                </div>
+              </div>
+              {/* Stats */}
+              {smartVetoConfig.stats && (
+                <div className="mt-4 grid grid-cols-3 gap-2 text-center">
+                  <div className="bg-red-500/10 rounded-lg p-2">
+                    <div className="text-lg font-bold text-red-400">{smartVetoConfig.stats.violence_alerts}</div>
+                    <div className="text-xs text-slate-400">{locale === 'ar' ? 'تنبيهات' : 'Alerts'}</div>
+                  </div>
+                  <div className="bg-yellow-500/10 rounded-lg p-2">
+                    <div className="text-lg font-bold text-yellow-400">{smartVetoConfig.stats.vetoed}</div>
+                    <div className="text-xs text-slate-400">{locale === 'ar' ? 'فيتو' : 'Vetoed'}</div>
+                  </div>
+                  <div className="bg-green-500/10 rounded-lg p-2">
+                    <div className="text-lg font-bold text-green-400">{smartVetoConfig.stats.safe}</div>
+                    <div className="text-xs text-slate-400">{locale === 'ar' ? 'آمن' : 'Safe'}</div>
+                  </div>
+                </div>
+              )}
+            </TextureCardContent>
+          </TextureCardStyled>
+        </motion.div>
+      )}
 
       {/* Session Statistics */}
       <AnimatePresence>

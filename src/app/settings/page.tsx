@@ -6,6 +6,7 @@ import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/lib/utils';
 import { useDetectionSettings, DEFAULT_DETECTION_SETTINGS } from '@/hooks/useDetectionSettings';
 import { useAlertSettings } from '@/hooks/useAlertSettings';
+import { useModelConfiguration } from '@/hooks/useModelConfiguration';
 import { useAuth } from '@/contexts/AuthContext';
 import { validatePhone, getLocalizedError } from '@/lib/validation';
 import {
@@ -293,6 +294,13 @@ export default function SettingsPage() {
     testWhatsApp,
   } = useAlertSettings(user?.id);
 
+  // Smart Veto model configuration
+  const {
+    config: modelConfig,
+    primaryModelSpec,
+    vetoModelSpec,
+  } = useModelConfiguration();
+
   // Use null to indicate "not yet edited by user" - falls back to alertSettings value
   // This avoids setState in useEffect (cascading render) while still syncing with server
   const [whatsappPhoneEdited, setWhatsappPhoneEdited] = useState<string | null>(null);
@@ -450,47 +458,6 @@ export default function SettingsPage() {
           defaultOpen={true}
         >
           <SmartVetoConfig locale={locale as 'en' | 'ar'} isRTL={isRTL} />
-        </SettingsSection>
-
-        {/* Detection Thresholds (Legacy/Quick Settings) */}
-        <SettingsSection
-          icon={Icons.shield}
-          title={locale === 'ar' ? 'إعدادات الكشف السريعة' : 'Quick Detection Settings'}
-          description={locale === 'ar' ? 'تعديل سريع لحدود الكشف' : 'Quick threshold adjustments'}
-        >
-          <div className="space-y-6">
-            <SliderSetting
-              label={t.detection.primary}
-              description={t.detection.primaryDesc}
-              value={settings.primary_threshold}
-              onChange={(v) => updateSetting('primary_threshold', v)}
-              min={10}
-              max={95}
-              color="red"
-              marks={[
-                { value: 10, label: '10% (Sensitive)' },
-                { value: 50, label: '50%' },
-                { value: 95, label: '95% (Strict)' },
-              ]}
-            />
-
-            <div className="h-px bg-zinc-800" />
-
-            <SliderSetting
-              label={t.detection.veto}
-              description={t.detection.vetoDesc}
-              value={settings.veto_threshold}
-              onChange={(v) => updateSetting('veto_threshold', v)}
-              min={1}
-              max={20}
-              color="orange"
-              marks={[
-                { value: 1, label: '1% (Aggressive)' },
-                { value: 4, label: '4%' },
-                { value: 20, label: '20% (Lenient)' },
-              ]}
-            />
-          </div>
         </SettingsSection>
 
         {/* Fight Alert Triggers */}
@@ -794,14 +761,30 @@ export default function SettingsPage() {
           </div>
         </SettingsSection>
 
-        {/* Summary */}
+        {/* Summary - Dynamic from Smart Veto Config */}
         <SummaryBox
           title={t.summary}
           items={[
-            { label: t.violenceCutoff, value: `${settings.primary_threshold}%`, color: 'text-red-400' },
-            { label: t.vetoOverride, value: `<${settings.veto_threshold}%`, color: 'text-orange-400' },
-            { label: t.instantAlert, value: `${settings.instant_trigger_count}×${settings.instant_trigger_threshold}%`, color: 'text-amber-400' },
-            { label: t.sustainedAlert, value: `${settings.sustained_duration}s@${settings.sustained_threshold}%`, color: 'text-amber-400' },
+            {
+              label: locale === 'ar' ? 'النموذج الأساسي' : 'PRIMARY Model',
+              value: primaryModelSpec?.displayName || modelConfig.primary_model,
+              color: 'text-blue-400'
+            },
+            {
+              label: locale === 'ar' ? 'حد الأساسي' : 'PRIMARY Threshold',
+              value: `≥${modelConfig.primary_threshold}%`,
+              color: 'text-red-400'
+            },
+            {
+              label: locale === 'ar' ? 'نموذج الفيتو' : 'VETO Model',
+              value: vetoModelSpec?.displayName || modelConfig.veto_model,
+              color: 'text-purple-400'
+            },
+            {
+              label: locale === 'ar' ? 'حد الفيتو' : 'VETO Threshold',
+              value: `≥${modelConfig.veto_threshold}%`,
+              color: 'text-orange-400'
+            },
           ]}
         />
 

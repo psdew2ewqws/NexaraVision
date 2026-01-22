@@ -119,6 +119,8 @@ export function SmartVetoConfig({ locale, isRTL = false }: SmartVetoConfigProps)
     config,
     isLoading,
     isSaving,
+    error,
+    saveSuccess,
     primaryModelSpec,
     vetoModelSpec,
     availableModels,
@@ -278,22 +280,78 @@ export function SmartVetoConfig({ locale, isRTL = false }: SmartVetoConfigProps)
         </div>
       </div>
 
-      {/* Save Button */}
-      <div className="flex justify-end pt-4">
-        <button
-          onClick={handleSave}
-          disabled={isSaving || !isValidCombination}
-          className={cn(
-            "flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-medium transition-all",
-            isSaving
-              ? "bg-purple-500/20 text-purple-400"
-              : "bg-purple-600 text-white hover:bg-purple-500",
-            "disabled:opacity-50 disabled:cursor-not-allowed"
+      {/* Save Button with Success/Error Feedback */}
+      <div className="space-y-3 pt-4">
+        {/* Success Message */}
+        <AnimatePresence>
+          {saveSuccess && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex items-center gap-2 px-4 py-3 bg-green-500/20 border border-green-500/30 rounded-lg"
+            >
+              <svg className="w-5 h-5 text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span className="text-sm font-medium text-green-400">
+                {locale === 'ar' ? 'تم حفظ التكوين بنجاح!' : 'Configuration saved successfully!'}
+              </span>
+            </motion.div>
           )}
-        >
-          {isSaving ? Icons.loader : Icons.check}
-          {isSaving ? 'Saving...' : t.apply}
-        </button>
+        </AnimatePresence>
+
+        {/* Error Message */}
+        <AnimatePresence>
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="flex items-center gap-2 px-4 py-3 bg-red-500/20 border border-red-500/30 rounded-lg"
+            >
+              <svg className="w-5 h-5 text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+              </svg>
+              <span className="text-sm font-medium text-red-400">{error}</span>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <div className="flex justify-end">
+          <button
+            onClick={handleSave}
+            disabled={isSaving || !isValidCombination || saveSuccess}
+            className={cn(
+              "flex items-center gap-2 px-6 py-3 rounded-lg text-sm font-medium transition-all",
+              saveSuccess
+                ? "bg-green-600 text-white"
+                : isSaving
+                  ? "bg-purple-500/20 text-purple-400"
+                  : "bg-purple-600 text-white hover:bg-purple-500",
+              "disabled:opacity-50 disabled:cursor-not-allowed"
+            )}
+          >
+            {saveSuccess ? (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                {locale === 'ar' ? 'تم الحفظ!' : 'Saved!'}
+              </>
+            ) : isSaving ? (
+              <>
+                {Icons.loader}
+                {locale === 'ar' ? 'جاري الحفظ...' : 'Saving...'}
+              </>
+            ) : (
+              <>
+                {Icons.check}
+                {t.apply}
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );
