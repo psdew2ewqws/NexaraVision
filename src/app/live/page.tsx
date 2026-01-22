@@ -2003,8 +2003,8 @@ export default function LivePage() {
                 {/* Canvas for frame capture (hidden) */}
                 <canvas ref={canvasRef} className="hidden" />
 
-                {/* Overlay for client-side pose drawing */}
-                <canvas ref={overlayCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ transform: sourceType === 'webcam' ? 'scaleX(-1)' : 'none' }} />
+                {/* Overlay for client-side pose drawing - hidden when server sends processed frames */}
+                <canvas ref={overlayCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ transform: sourceType === 'webcam' ? 'scaleX(-1)' : 'none', opacity: showProcessedFrame ? 0 : 1 }} />
 
                 {/* Server-rendered frame with skeleton (zero-delay, perfectly synced) */}
                 <canvas ref={processedFrameCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ transform: sourceType === 'webcam' ? 'scaleX(-1)' : 'none' }} />
