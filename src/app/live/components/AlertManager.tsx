@@ -54,12 +54,14 @@ export function AlertManager({
   };
 
   // Utility functions for future alert styling - currently unused
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _getAlertColor = (confidence: number) => {
     if (confidence >= 0.9) return 'border-red-500 bg-red-950/30';
     if (confidence >= 0.8) return 'border-orange-500 bg-orange-950/30';
     return 'border-yellow-500 bg-yellow-950/30';
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const _getAlertIcon = (confidence: number) => {
     if (confidence >= 0.9)
       return <AlertCircle className="h-5 w-5 text-red-500" />;

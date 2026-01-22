@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
@@ -29,17 +29,11 @@ export function IncidentReplay({ event, onClose }: IncidentReplayProps) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const frames = event?.clipData || [];
+  // Memoize frames to prevent dependency changes on every render
+  const frames = useMemo(() => event?.clipData || [], [event?.clipData]);
   const totalFrames = frames.length;
 
-  // Stop playback when reaching end
-  useEffect(() => {
-    if (currentFrame >= totalFrames - 1) {
-      setIsPlaying(false);
-    }
-  }, [currentFrame, totalFrames]);
-
-  // Playback control
+  // Playback control (handles stopping at end via setCurrentFrame callback)
   useEffect(() => {
     if (isPlaying && totalFrames > 0) {
       const frameRate = 30; // Original capture rate

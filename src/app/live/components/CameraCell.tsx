@@ -13,6 +13,7 @@ interface CameraCellProps {
   isActive: boolean;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function CameraCell({ id: _id, label, violenceProb, imageData, isActive }: CameraCellProps) {
   const isViolent = violenceProb > 85;
   const isWarning = violenceProb > 60 && violenceProb <= 85;

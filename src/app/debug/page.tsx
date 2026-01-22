@@ -43,13 +43,21 @@ CREATE POLICY "Allow public reads" ON storage.objects
 
 -- Done! Now test: curl http://localhost:3000/api/test-db`;
 
+// Type for debug test results
+interface DebugResult {
+  step: string;
+  success: boolean;
+  data?: Record<string, unknown>;
+  time: string;
+}
+
 export default function DebugPage() {
   const { user, session, profile, loading: authLoading } = useAuth();
-  const [results, setResults] = useState<any[]>([]);
+  const [results, setResults] = useState<DebugResult[]>([]);
   const [testing, setTesting] = useState(false);
   const [cleaning, setCleaning] = useState(false);
 
-  const addResult = (step: string, success: boolean, data?: any) => {
+  const addResult = (step: string, success: boolean, data?: Record<string, unknown>) => {
     setResults(prev => [...prev, { step, success, data, time: new Date().toISOString() }]);
   };
 
