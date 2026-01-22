@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { useDetectionSettings, DEFAULT_DETECTION_SETTINGS } from '@/hooks/useDetectionSettings';
 import { useAlertSettings } from '@/hooks/useAlertSettings';
 import { useAuth } from '@/contexts/AuthContext';
+import { validatePhone, getLocalizedError } from '@/lib/validation';
 import {
   SettingsSection,
   SliderSetting,
@@ -292,6 +293,7 @@ export default function SettingsPage() {
   } = useAlertSettings(user?.id);
 
   const [whatsappPhone, setWhatsappPhone] = useState('');
+  const [whatsappPhoneError, setWhatsappPhoneError] = useState<string | null>(null);
   const [whatsappTesting, setWhatsappTesting] = useState(false);
   const [whatsappTestResult, setWhatsappTestResult] = useState<'success' | 'failed' | null>(null);
   const [whatsappError, setWhatsappError] = useState<string | null>(null);
@@ -302,6 +304,18 @@ export default function SettingsPage() {
       setWhatsappPhone(alertSettings.whatsapp_number);
     }
   }, [alertSettings?.whatsapp_number]);
+
+  // Validate phone number on change
+  const handlePhoneChange = (value: string) => {
+    setWhatsappPhone(value);
+    // Only show error if user has typed something
+    if (value.trim()) {
+      const validation = validatePhone(value);
+      setWhatsappPhoneError(validation.isValid ? null : (getLocalizedError(validation.error, locale) || validation.error || null));
+    } else {
+      setWhatsappPhoneError(null);
+    }
+  };
 
   const handleWhatsAppToggle = async (enabled: boolean) => {
     console.log('[Settings] WhatsApp toggle clicked, enabled:', enabled, 'phone:', whatsappPhone);
@@ -322,15 +336,29 @@ export default function SettingsPage() {
 
   const handleWhatsAppSave = async () => {
     if (!whatsappPhone) return;
+    // Validate before saving
+    const validation = validatePhone(whatsappPhone, true);
+    if (!validation.isValid) {
+      setWhatsappPhoneError(getLocalizedError(validation.error, locale) || validation.error || null);
+      return;
+    }
     await updateAlertSettings({
       whatsapp_number: whatsappPhone,
     });
+    setWhatsappPhoneError(null);
     setWhatsappTestResult('success');
     setTimeout(() => setWhatsappTestResult(null), 2000);
   };
 
   const handleWhatsAppTest = async () => {
     if (!whatsappPhone) return;
+    // Validate before testing
+    const validation = validatePhone(whatsappPhone, true);
+    if (!validation.isValid) {
+      setWhatsappPhoneError(getLocalizedError(validation.error, locale) || validation.error || null);
+      return;
+    }
+    setWhatsappPhoneError(null);
     setWhatsappTesting(true);
     setWhatsappTestResult(null);
     setWhatsappError(null);
@@ -616,20 +644,23 @@ export default function SettingsPage() {
                 <input
                   type="tel"
                   value={whatsappPhone}
-                  onChange={(e) => setWhatsappPhone(e.target.value)}
+                  onChange={(e) => handlePhoneChange(e.target.value)}
                   placeholder={t.whatsapp.phonePlaceholder}
                   className={cn(
                     "flex-1 px-3 py-2 rounded-lg text-sm",
-                    "bg-zinc-800 border border-zinc-700 text-white",
+                    "bg-zinc-800 text-white",
                     "placeholder:text-zinc-500",
-                    "focus:outline-none focus:ring-2 focus:ring-emerald-500/50 focus:border-emerald-500/50",
+                    "focus:outline-none focus:ring-2 focus:ring-emerald-500/50",
+                    whatsappPhoneError
+                      ? "border-2 border-red-500/50 focus:border-red-500/50 focus:ring-red-500/30"
+                      : "border border-zinc-700 focus:border-emerald-500/50",
                     isRTL && "text-right"
                   )}
                   dir="ltr"
                 />
                 <button
                   onClick={handleWhatsAppSave}
-                  disabled={alertSaving || !whatsappPhone}
+                  disabled={alertSaving || !whatsappPhone || !!whatsappPhoneError}
                   className={cn(
                     "px-4 py-2 rounded-lg text-sm font-medium transition-all",
                     "bg-zinc-700 text-white hover:bg-zinc-600",
@@ -639,6 +670,9 @@ export default function SettingsPage() {
                   {alertSaving ? Icons.loader : t.whatsapp.save}
                 </button>
               </div>
+              {whatsappPhoneError && (
+                <p className="text-xs text-red-400 mt-1">{whatsappPhoneError}</p>
+              )}
             </div>
 
             {/* Test Message Button */}
@@ -646,7 +680,7 @@ export default function SettingsPage() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={handleWhatsAppTest}
-                  disabled={whatsappTesting || !whatsappPhone}
+                  disabled={whatsappTesting || !whatsappPhone || !!whatsappPhoneError}
                   className={cn(
                     "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
                     whatsappTestResult === 'success'

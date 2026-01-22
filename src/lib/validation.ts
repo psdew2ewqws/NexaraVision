@@ -180,3 +180,122 @@ export function sanitizeText(value: string): string {
 export function clamp(value: number, min: number, max: number): number {
   return Math.min(Math.max(value, min), max);
 }
+
+// ============================================
+// Form Validation Utilities for UI Forms
+// ============================================
+
+export interface FormFieldValidation {
+  isValid: boolean;
+  error?: string;
+}
+
+/**
+ * Validates phone number with international format
+ * Accepts: +966501234567, +1234567890, etc.
+ */
+export function validatePhone(phone: string, required: boolean = false): FormFieldValidation {
+  if (!phone || phone.trim().length === 0) {
+    if (required) {
+      return { isValid: false, error: 'Phone number is required' };
+    }
+    return { isValid: true };
+  }
+
+  // Remove spaces and dashes for validation
+  const cleaned = phone.replace(/[\s-]/g, '');
+
+  // International phone format: + followed by 7-15 digits
+  const phoneRegex = /^\+[1-9]\d{6,14}$/;
+
+  if (!phoneRegex.test(cleaned)) {
+    return {
+      isValid: false,
+      error: 'Enter a valid phone with country code (e.g., +966501234567)'
+    };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Validates password with minimum length
+ */
+export function validatePassword(password: string, minLength: number = 6): FormFieldValidation {
+  if (!password || password.length === 0) {
+    return { isValid: false, error: 'Password is required' };
+  }
+
+  if (password.length < minLength) {
+    return { isValid: false, error: `Password must be at least ${minLength} characters` };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Validates password confirmation matches
+ */
+export function validatePasswordMatch(password: string, confirmPassword: string): FormFieldValidation {
+  if (password !== confirmPassword) {
+    return { isValid: false, error: 'Passwords do not match' };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Validates email format with user-friendly error
+ */
+export function validateEmailField(email: string): FormFieldValidation {
+  if (!email || email.trim().length === 0) {
+    return { isValid: false, error: 'Email is required' };
+  }
+
+  if (!isValidEmail(email)) {
+    return { isValid: false, error: 'Please enter a valid email address' };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Validates full name
+ */
+export function validateFullName(name: string): FormFieldValidation {
+  if (!name || name.trim().length === 0) {
+    return { isValid: false, error: 'Full name is required' };
+  }
+
+  if (name.trim().length < 2) {
+    return { isValid: false, error: 'Name must be at least 2 characters' };
+  }
+
+  return { isValid: true };
+}
+
+/**
+ * Arabic translations for validation errors
+ */
+export const validationErrorsAr: Record<string, string> = {
+  'Email is required': 'البريد الإلكتروني مطلوب',
+  'Please enter a valid email address': 'يرجى إدخال بريد إلكتروني صحيح',
+  'Password is required': 'كلمة المرور مطلوبة',
+  'Password must be at least 6 characters': 'يجب أن تكون كلمة المرور 6 أحرف على الأقل',
+  'Passwords do not match': 'كلمات المرور غير متطابقة',
+  'Phone number is required': 'رقم الهاتف مطلوب',
+  'Enter a valid phone with country code (e.g., +966501234567)': 'أدخل رقم هاتف صحيح مع رمز الدولة (مثال: 966501234567+)',
+  'Full name is required': 'الاسم الكامل مطلوب',
+  'Name must be at least 2 characters': 'يجب أن يكون الاسم حرفين على الأقل',
+};
+
+/**
+ * Get localized error message
+ */
+export function getLocalizedError(error: string | undefined, locale: string): string | undefined {
+  if (!error) return undefined;
+  if (locale === 'ar' && validationErrorsAr[error]) {
+    return validationErrorsAr[error];
+  }
+  return error;
+}
