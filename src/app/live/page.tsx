@@ -1210,6 +1210,7 @@ export default function LivePage() {
   };
 
   // Display processed frame from server (with skeleton already drawn) for perfect sync
+  // MOBILE FIX: Account for object-contain letterboxing to match video position
   const displayProcessedFrame = (base64Data: string) => {
     const canvas = processedFrameCanvasRef.current;
     const video = videoRef.current;
@@ -1221,14 +1222,42 @@ export default function LivePage() {
     // Create image from base64
     const img = new Image();
     img.onload = () => {
-      // Match canvas to video display size
-      const displayWidth = video.clientWidth || video.videoWidth || 640;
-      const displayHeight = video.clientHeight || video.videoHeight || 480;
-      canvas.width = displayWidth;
-      canvas.height = displayHeight;
+      // Container dimensions
+      const containerWidth = video.clientWidth || video.videoWidth || 640;
+      const containerHeight = video.clientHeight || video.videoHeight || 480;
+      canvas.width = containerWidth;
+      canvas.height = containerHeight;
 
-      // Draw the processed frame (which has skeleton already drawn by server)
-      ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+      // Clear with transparency
+      ctx.clearRect(0, 0, containerWidth, containerHeight);
+
+      // MOBILE FIX: Calculate video content area (object-contain letterboxing)
+      const videoNativeWidth = video.videoWidth || 640;
+      const videoNativeHeight = video.videoHeight || 480;
+      const videoAspect = videoNativeWidth / videoNativeHeight;
+      const containerAspect = containerWidth / containerHeight;
+
+      let drawWidth: number;
+      let drawHeight: number;
+      let offsetX: number;
+      let offsetY: number;
+
+      if (videoAspect > containerAspect) {
+        // Video is wider - letterbox top/bottom
+        drawWidth = containerWidth;
+        drawHeight = containerWidth / videoAspect;
+        offsetX = 0;
+        offsetY = (containerHeight - drawHeight) / 2;
+      } else {
+        // Video is taller - letterbox left/right (mobile portrait)
+        drawHeight = containerHeight;
+        drawWidth = containerHeight * videoAspect;
+        offsetX = (containerWidth - drawWidth) / 2;
+        offsetY = 0;
+      }
+
+      // Draw the processed frame within the correct area to match video position
+      ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
 
       // Hide raw video, show processed frame (prevents double image)
       setShowProcessedFrame(true);
@@ -1248,12 +1277,12 @@ export default function LivePage() {
 
   // Draw YOLO v26 skeletons from server response (COCO 17-keypoint format)
   // CRITICAL: Server coordinates are in SENT FRAME SIZE (max 640x480), not video native size!
+  // MOBILE FIX: Account for object-contain letterboxing
   const drawServerSkeletons = (skeletons: number[][][]) => {
     const overlay = overlayCanvasRef.current;
     const video = videoRef.current;
     if (!overlay || !video) {
       return; // Missing overlay or video
-      return;
     }
 
     const ctx = overlay.getContext('2d');
@@ -1276,12 +1305,38 @@ export default function LivePage() {
       sentHeight = Math.round(sentHeight * scale);
     }
 
-    // Set canvas to match video display size
-    const displayWidth = video.clientWidth || videoNativeWidth;
-    const displayHeight = video.clientHeight || videoNativeHeight;
-    overlay.width = displayWidth;
-    overlay.height = displayHeight;
-    ctx.clearRect(0, 0, displayWidth, displayHeight);
+    // Container dimensions (the canvas will fill this)
+    const containerWidth = video.clientWidth || videoNativeWidth;
+    const containerHeight = video.clientHeight || videoNativeHeight;
+
+    // Set canvas to match container size
+    overlay.width = containerWidth;
+    overlay.height = containerHeight;
+    ctx.clearRect(0, 0, containerWidth, containerHeight);
+
+    // MOBILE FIX: Calculate actual video content area within container (object-contain letterboxing)
+    // The video is scaled to fit while maintaining aspect ratio, creating letterbox bars
+    const videoAspect = videoNativeWidth / videoNativeHeight;
+    const containerAspect = containerWidth / containerHeight;
+
+    let videoDisplayWidth: number;
+    let videoDisplayHeight: number;
+    let offsetX: number;
+    let offsetY: number;
+
+    if (videoAspect > containerAspect) {
+      // Video is wider than container - letterbox on top/bottom
+      videoDisplayWidth = containerWidth;
+      videoDisplayHeight = containerWidth / videoAspect;
+      offsetX = 0;
+      offsetY = (containerHeight - videoDisplayHeight) / 2;
+    } else {
+      // Video is taller than container - letterbox on left/right (mobile portrait mode)
+      videoDisplayHeight = containerHeight;
+      videoDisplayWidth = containerHeight * videoAspect;
+      offsetX = (containerWidth - videoDisplayWidth) / 2;
+      offsetY = 0;
+    }
 
     // COCO 17-keypoint skeleton connections
     const connections = [
@@ -1293,11 +1348,9 @@ export default function LivePage() {
 
     const colors = ['#00ff00', '#ff6600', '#00ffff', '#ff00ff', '#ffff00'];
 
-    // Scale from SENT frame coordinates to DISPLAY coordinates
-    const scaleX = displayWidth / sentWidth;
-    const scaleY = displayHeight / sentHeight;
-
-    // Skeleton scaling: sent ${sentWidth}x${sentHeight} -> display ${displayWidth}x${displayHeight}
+    // Scale from SENT frame coordinates to actual VIDEO DISPLAY area (not container!)
+    const scaleX = videoDisplayWidth / sentWidth;
+    const scaleY = videoDisplayHeight / sentHeight;
 
     skeletons.forEach((skeleton, poseIndex) => {
       if (!skeleton || skeleton.length < 17) {
@@ -1316,10 +1369,11 @@ export default function LivePage() {
         const kp1 = skeleton[i];
         const kp2 = skeleton[j];
         if (kp1 && kp2 && kp1[2] > 0.3 && kp2[2] > 0.3) {
-          const x1 = kp1[0] * scaleX;
-          const y1 = kp1[1] * scaleY;
-          const x2 = kp2[0] * scaleX;
-          const y2 = kp2[1] * scaleY;
+          // MOBILE FIX: Add offset for letterboxing
+          const x1 = kp1[0] * scaleX + offsetX;
+          const y1 = kp1[1] * scaleY + offsetY;
+          const x2 = kp2[0] * scaleX + offsetX;
+          const y2 = kp2[1] * scaleY + offsetY;
 
           ctx.beginPath();
           ctx.moveTo(x1, y1);
@@ -1332,8 +1386,9 @@ export default function LivePage() {
       ctx.shadowBlur = 0;
       skeleton.forEach((kp) => {
         if (kp && kp[2] > 0.3) {
-          const x = kp[0] * scaleX;
-          const y = kp[1] * scaleY;
+          // MOBILE FIX: Add offset for letterboxing
+          const x = kp[0] * scaleX + offsetX;
+          const y = kp[1] * scaleY + offsetY;
 
           ctx.beginPath();
           ctx.arc(x, y, 6, 0, 2 * Math.PI);
