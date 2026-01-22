@@ -127,6 +127,29 @@ export function useFrameEncoder() {
     }
   }, [sendMessage, isSupported]);
 
+  // Fallback main thread encoding (defined first to avoid hoisting issues)
+  const encodeOnMainThread = useCallback((
+    video: HTMLVideoElement,
+    width: number,
+    height: number,
+    quality: number
+  ): string | null => {
+    try {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
+
+      ctx.drawImage(video, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL('image/jpeg', quality);
+      return dataUrl.split(',')[1]; // Return just the base64 part
+    } catch (err) {
+      console.error('[FrameEncoder] Main thread encode failed:', err);
+      return null;
+    }
+  }, []);
+
   // Encode video frame directly from video element
   const encodeVideoFrame = useCallback(async (
     video: HTMLVideoElement,
@@ -154,30 +177,7 @@ export function useFrameEncoder() {
       // Fallback to main thread
       return encodeOnMainThread(video, width, height, quality);
     }
-  }, [encodeFrame, isSupported]);
-
-  // Fallback main thread encoding
-  const encodeOnMainThread = useCallback((
-    video: HTMLVideoElement,
-    width: number,
-    height: number,
-    quality: number
-  ): string | null => {
-    try {
-      const canvas = document.createElement('canvas');
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return null;
-
-      ctx.drawImage(video, 0, 0, width, height);
-      const dataUrl = canvas.toDataURL('image/jpeg', quality);
-      return dataUrl.split(',')[1]; // Return just the base64 part
-    } catch (err) {
-      console.error('[FrameEncoder] Main thread encode failed:', err);
-      return null;
-    }
-  }, []);
+  }, [encodeFrame, encodeOnMainThread, isSupported]);
 
   return {
     isReady,

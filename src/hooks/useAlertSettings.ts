@@ -210,7 +210,7 @@ export function useAlertSettings(userId: string | undefined) {
       } else {
         return { success: false, error: data.error || 'Failed to send test message' };
       }
-    } catch (err) {
+    } catch {
       return { success: false, error: 'Network error' };
     }
   };

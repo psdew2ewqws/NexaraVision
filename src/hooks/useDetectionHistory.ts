@@ -52,20 +52,19 @@ export function useDetectionHistory(
     storageKey = 'nexara-detection-history',
   } = options;
 
-  const [events, setEvents] = useState<DetectionEvent[]>([]);
-
-  // Load events from localStorage on mount
-  useEffect(() => {
+  // Use lazy initialization to load from localStorage without cascading renders
+  const [events, setEvents] = useState<DetectionEvent[]>(() => {
+    if (typeof window === 'undefined') return [];
     try {
       const stored = localStorage.getItem(storageKey);
       if (stored) {
-        const parsed = JSON.parse(stored);
-        setEvents(parsed);
+        return JSON.parse(stored);
       }
     } catch (err) {
       console.error('Failed to load detection history:', err);
     }
-  }, [storageKey]);
+    return [];
+  });
 
   // Auto-save events to localStorage
   useEffect(() => {
