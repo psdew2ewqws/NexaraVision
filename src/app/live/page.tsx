@@ -306,6 +306,10 @@ export default function LivePage() {
   const activeCameraRef = useRef<CameraRecord | null>(null);
   const defaultLocationRef = useRef<Location | null>(null);
 
+  // Refs for alertSettings and user to avoid stale closures in WebSocket callbacks
+  const alertSettingsRef = useRef(alertSettings);
+  const userRef = useRef(user);
+
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -943,16 +947,25 @@ export default function LivePage() {
       if (incident) {
         currentIncidentIdRef.current = incident.id;
         setDbError(null); // Clear any previous error
+        console.log('[Incident] ✅ Created incident:', incident.id);
 
-        // Send WhatsApp alert if enabled
-        if (alertSettings?.whatsapp_enabled && alertSettings?.whatsapp_number && user?.id) {
-          console.log('[WhatsApp] Sending violence alert to:', alertSettings.whatsapp_number);
+        // Send WhatsApp alert if enabled - USE REFS to avoid stale closure!
+        const currentAlertSettings = alertSettingsRef.current;
+        const currentUser = userRef.current;
+        console.log('[WhatsApp] Check enabled:', {
+          whatsapp_enabled: currentAlertSettings?.whatsapp_enabled,
+          whatsapp_number: currentAlertSettings?.whatsapp_number,
+          userId: currentUser?.id,
+        });
+
+        if (currentAlertSettings?.whatsapp_enabled && currentAlertSettings?.whatsapp_number && currentUser?.id) {
+          console.log('[WhatsApp] Sending violence alert to:', currentAlertSettings.whatsapp_number);
           fetch('/api/whatsapp/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              phone: alertSettings.whatsapp_number,
-              userId: user.id,
+              phone: currentAlertSettings.whatsapp_number,
+              userId: currentUser.id,
               incidentId: incident.id,
               cameraName: camera?.name || 'Browser Camera',
               locationName: location?.name || 'Unknown Location',
@@ -962,14 +975,16 @@ export default function LivePage() {
           }).then(res => res.json())
             .then(data => {
               if (data.success) {
-                console.log('[WhatsApp] Alert sent successfully:', data.id);
+                console.log('[WhatsApp] ✅ Alert sent successfully:', data.id);
               } else if (data.cooldownActive) {
-                console.log('[WhatsApp] Cooldown active, skipped alert');
+                console.log('[WhatsApp] ⏱️ Cooldown active, skipped alert');
               } else {
-                console.error('[WhatsApp] Failed to send alert:', data.error);
+                console.error('[WhatsApp] ❌ Failed to send alert:', data.error);
               }
             })
-            .catch(err => console.error('[WhatsApp] Error sending alert:', err));
+            .catch(err => console.error('[WhatsApp] ❌ Error sending alert:', err));
+        } else {
+          console.log('[WhatsApp] Skipped - not configured or user not logged in');
         }
       } else if (error) {
         console.error('[Incident] ❌ Failed to create:', error);
@@ -1649,6 +1664,15 @@ export default function LivePage() {
   useEffect(() => {
     defaultLocationRef.current = defaultLocation;
   }, [defaultLocation]);
+
+  // Sync alertSettingsRef and userRef to avoid stale closures in WebSocket callbacks
+  useEffect(() => {
+    alertSettingsRef.current = alertSettings;
+  }, [alertSettings]);
+
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
 
   // Sync isActiveRef with isActive state (prevents stale closure in WS onclose)
   useEffect(() => {
