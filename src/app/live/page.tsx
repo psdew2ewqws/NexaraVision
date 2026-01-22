@@ -134,6 +134,7 @@ const translations = {
       title: 'Source',
       webcam: 'Webcam',
       screen: 'Screen Share',
+      screenUnavailable: 'Not available on mobile',
       upload: 'Video Upload',
     },
     detection: {
@@ -195,6 +196,7 @@ const translations = {
       title: 'المصدر',
       webcam: 'كاميرا الويب',
       screen: 'مشاركة الشاشة',
+      screenUnavailable: 'غير متاح على الجوال',
       upload: 'رفع فيديو',
     },
     detection: {
@@ -287,6 +289,16 @@ export default function LivePage() {
 
   // Track if server is sending processed frames (to hide raw video and show server-rendered frame)
   const [showProcessedFrame, setShowProcessedFrame] = useState(false);
+
+  // MOBILE FIX: Check if screen share is supported (not available on mobile browsers)
+  const [isScreenShareSupported, setIsScreenShareSupported] = useState(true);
+  useEffect(() => {
+    // Check if getDisplayMedia is available (not supported on mobile browsers)
+    const supported = typeof navigator !== 'undefined' &&
+      navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getDisplayMedia === 'function';
+    setIsScreenShareSupported(supported);
+  }, []);
 
   // Detection settings from Supabase (per-user) with localStorage fallback
   const { settings: detectionSettings, isLoading: settingsLoading, isAuthenticated: settingsAuthenticated } = useDetectionSettings();
@@ -1878,31 +1890,40 @@ export default function LivePage() {
               <TextureCardContent className="space-y-2">
                 {[
                   { key: 'webcam', icon: Camera, label: t.sources.webcam },
-                  { key: 'screen', icon: Monitor, label: t.sources.screen },
+                  { key: 'screen', icon: Monitor, label: t.sources.screen, unavailableLabel: t.sources.screenUnavailable },
                   { key: 'upload', icon: Upload, label: t.sources.upload },
-                ].map(({ key, icon: Icon, label }) => (
-                  <button
-                    key={key}
-                    onClick={() => {
-                      if (!isActive) {
-                        setSource(key as SourceType);
-                        if (key === 'upload') fileInputRef.current?.click();
-                      }
-                    }}
-                    disabled={isActive}
-                    className={cn(
-                      'w-full p-3 rounded-xl flex items-center gap-3 transition-all min-h-[48px] active:scale-[0.98]',
-                      source === key
-                        ? 'bg-red-600/20 border border-red-500/50 text-red-400'
-                        : 'bg-slate-800/50 border border-transparent text-slate-400 hover:bg-slate-700/50',
-                      isActive && 'opacity-50 cursor-not-allowed'
-                    )}
-                  >
-                    <Icon className="w-5 h-5" />
-                    <span className="font-medium">{label}</span>
-                    {source === key && <ChevronRight className={cn('w-4 h-4 ml-auto', isRTL && 'rotate-180')} />}
-                  </button>
-                ))}
+                ].map(({ key, icon: Icon, label, unavailableLabel }) => {
+                  // MOBILE FIX: Disable screen share on mobile (not supported)
+                  const isScreenShareDisabled = key === 'screen' && !isScreenShareSupported;
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        if (!isActive && !isScreenShareDisabled) {
+                          setSource(key as SourceType);
+                          if (key === 'upload') fileInputRef.current?.click();
+                        }
+                      }}
+                      disabled={isActive || isScreenShareDisabled}
+                      className={cn(
+                        'w-full p-3 rounded-xl flex items-center gap-3 transition-all min-h-[48px] active:scale-[0.98]',
+                        source === key
+                          ? 'bg-red-600/20 border border-red-500/50 text-red-400'
+                          : 'bg-slate-800/50 border border-transparent text-slate-400 hover:bg-slate-700/50',
+                        (isActive || isScreenShareDisabled) && 'opacity-50 cursor-not-allowed'
+                      )}
+                    >
+                      <Icon className="w-5 h-5" />
+                      <div className="flex flex-col items-start">
+                        <span className="font-medium">{label}</span>
+                        {isScreenShareDisabled && unavailableLabel && (
+                          <span className="text-xs text-slate-500">{unavailableLabel}</span>
+                        )}
+                      </div>
+                      {source === key && <ChevronRight className={cn('w-4 h-4 ml-auto', isRTL && 'rotate-180')} />}
+                    </button>
+                  );
+                })}
                 <input ref={fileInputRef} type="file" accept="video/*" onChange={handleFileUpload} className="hidden" />
                 {uploadedFile && (
                   <div className="mt-2 p-2 bg-slate-800/50 rounded-lg flex items-center gap-2">
