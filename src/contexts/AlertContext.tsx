@@ -1,10 +1,13 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
 import { RealtimeChannel, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { getSupabase } from '@/lib/supabase/client';
 import { useAuth } from './AuthContext';
 import { alertLogger as log } from '@/lib/logger';
+
+// Track incidents we've already triggered WhatsApp for to prevent duplicates
+const whatsappSentIncidents = new Set<string>();
 
 // Incident data from Supabase realtime
 interface IncidentPayload {
@@ -59,6 +62,111 @@ export function AlertProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
 
   const supabase = getSupabase();
+
+  // Ref to store user's alert settings for WhatsApp
+  const alertSettingsRef = useRef<{
+    whatsapp_enabled: boolean;
+    whatsapp_number: string | null;
+    min_confidence: number;
+  } | null>(null);
+
+  // Fetch user's alert settings on mount/user change
+  useEffect(() => {
+    if (!user?.id) {
+      alertSettingsRef.current = null;
+      return;
+    }
+
+    const fetchAlertSettings = async () => {
+      const { data, error } = await supabase
+        .from('alert_settings')
+        .select('whatsapp_enabled, whatsapp_number, min_confidence')
+        .eq('user_id', user.id)
+        .single();
+
+      if (!error && data) {
+        alertSettingsRef.current = data;
+        log.debug('[AlertContext] Loaded user alert settings:', {
+          whatsapp_enabled: data.whatsapp_enabled,
+          has_number: !!data.whatsapp_number,
+        });
+      } else {
+        alertSettingsRef.current = null;
+      }
+    };
+
+    fetchAlertSettings();
+  }, [user?.id, supabase]);
+
+  // Send WhatsApp alert for current user when incident is received via realtime
+  // This ensures WhatsApp works even when detection runs on external machines
+  const sendWhatsAppForCurrentUser = useCallback(async (
+    incident: IncidentPayload,
+    alertData: AlertData
+  ) => {
+    // Skip if already sent for this incident (prevent duplicates from multiple tabs)
+    if (whatsappSentIncidents.has(incident.id)) {
+      log.debug('[AlertContext] WhatsApp already sent for incident:', incident.id);
+      return;
+    }
+
+    const settings = alertSettingsRef.current;
+    if (!settings?.whatsapp_enabled || !settings?.whatsapp_number) {
+      log.debug('[AlertContext] WhatsApp not enabled or no number for current user');
+      return;
+    }
+
+    // Check confidence threshold
+    const minConfidence = settings.min_confidence || 0;
+    if (incident.confidence < minConfidence) {
+      log.debug('[AlertContext] Incident confidence below threshold:', incident.confidence, '<', minConfidence);
+      return;
+    }
+
+    // Mark as sent before making request to prevent race conditions
+    whatsappSentIncidents.add(incident.id);
+
+    try {
+      log.debug('[AlertContext] Sending WhatsApp alert for incident:', incident.id);
+
+      const response = await fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: settings.whatsapp_number,
+          userId: user?.id,
+          incidentId: incident.id,
+          cameraName: alertData.camera,
+          locationName: alertData.location,
+          confidence: incident.confidence,
+          timestamp: incident.detected_at || new Date().toISOString(),
+        }),
+        keepalive: true,
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        log.debug('[AlertContext] ✅ WhatsApp alert sent successfully');
+      } else if (result.cooldownActive) {
+        log.debug('[AlertContext] ⏰ WhatsApp cooldown active:', result.remainingSeconds, 's remaining');
+      } else {
+        log.error('[AlertContext] WhatsApp send failed:', result.error);
+        // Remove from sent set so it can retry
+        whatsappSentIncidents.delete(incident.id);
+      }
+    } catch (err) {
+      log.error('[AlertContext] WhatsApp request failed:', err);
+      // Remove from sent set so it can retry
+      whatsappSentIncidents.delete(incident.id);
+    }
+
+    // Clean up old entries periodically (keep last 100)
+    if (whatsappSentIncidents.size > 100) {
+      const idsArray = Array.from(whatsappSentIncidents);
+      idsArray.slice(0, 50).forEach(id => whatsappSentIncidents.delete(id));
+    }
+  }, [user?.id]);
 
   // Dismiss an alert from the notification list
   const dismissAlert = useCallback((id: string) => {
@@ -186,7 +294,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     }
   }, [user, supabase]);
 
-  // Setup realtime subscription for new incidents
+  // Setup realtime subscription for new incidents with auto-reconnect
   useEffect(() => {
     // Only subscribe if user is authenticated
     if (!user) {
@@ -197,16 +305,23 @@ export function AlertProvider({ children }: { children: ReactNode }) {
 
     let incidentChannel: RealtimeChannel;
     let mounted = true;
+    let reconnectAttempts = 0;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    const MAX_RECONNECT_ATTEMPTS = 5;
+    const RECONNECT_DELAY_MS = 3000;
 
     const setupRealtimeIncidents = async () => {
       log.debug('[AlertContext] Setting up realtime subscription for incidents...');
+      log.debug('[AlertContext] User authenticated:', user.email);
       setRealtimeStatus('connecting');
 
+      // Create a unique channel name to avoid conflicts
+      const channelName = `incidents-alerts-${user.id.slice(0, 8)}`;
+
       incidentChannel = supabase
-        .channel('incidents-global', {
+        .channel(channelName, {
           config: {
             broadcast: { self: true },
-            presence: { key: user.id },
           }
         })
         .on(
@@ -231,6 +346,10 @@ export function AlertProvider({ children }: { children: ReactNode }) {
             // Play alert sound
             playAlertSound();
 
+            // Send WhatsApp alert for current user
+            // This ensures WhatsApp works even when detection runs externally
+            sendWhatsAppForCurrentUser(incident, newAlert);
+
             log.debug('[AlertContext] ✅ Alert added:', newAlert.id);
           }
         )
@@ -242,9 +361,23 @@ export function AlertProvider({ children }: { children: ReactNode }) {
           if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
             log.debug('[AlertContext] ✅ Realtime subscription ACTIVE - listening for incidents');
             setRealtimeStatus('connected');
+            reconnectAttempts = 0; // Reset on successful connection
           } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
             log.error('[AlertContext] ❌ Realtime subscription ERROR:', err);
+            log.error('[AlertContext] 💡 Hint: Ensure realtime is enabled for "incidents" table in Supabase Dashboard > Database > Replication');
             setRealtimeStatus('error');
+
+            // Attempt reconnection
+            if (reconnectAttempts < MAX_RECONNECT_ATTEMPTS && mounted) {
+              reconnectAttempts++;
+              log.debug(`[AlertContext] Attempting reconnect ${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS} in ${RECONNECT_DELAY_MS}ms...`);
+              reconnectTimeout = setTimeout(() => {
+                if (mounted && incidentChannel) {
+                  supabase.removeChannel(incidentChannel);
+                  setupRealtimeIncidents();
+                }
+              }, RECONNECT_DELAY_MS * reconnectAttempts);
+            }
           } else if (status === REALTIME_SUBSCRIBE_STATES.TIMED_OUT) {
             log.error('[AlertContext] ⏱️ Realtime subscription TIMED OUT');
             setRealtimeStatus('error');
@@ -259,13 +392,16 @@ export function AlertProvider({ children }: { children: ReactNode }) {
 
     return () => {
       mounted = false;
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
       if (incidentChannel) {
         log.debug('[AlertContext] Cleaning up subscription');
         supabase.removeChannel(incidentChannel);
       }
       setRealtimeStatus('disconnected');
     };
-  }, [user, supabase, processIncidentToAlert]);
+  }, [user, supabase, processIncidentToAlert, sendWhatsAppForCurrentUser]);
 
   return (
     <AlertContext.Provider

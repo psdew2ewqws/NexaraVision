@@ -1585,25 +1585,62 @@ export default function LivePage() {
 
   // Start incident recording when violence is detected
   const startIncidentRecording = useCallback(() => {
-    if (!streamRef.current) return;
+    recordingLog.debug('[Recording] startIncidentRecording called, stream:', !!streamRef.current);
+
+    if (!streamRef.current) {
+      recordingLog.warn('[Recording] No stream available - cannot start recording');
+      return;
+    }
 
     // If already recording, just reset the timer (handled in triggerRecordingReset)
-    if (mediaRecorderRef.current) return;
+    if (mediaRecorderRef.current) {
+      recordingLog.debug('[Recording] Already recording - skipping');
+      return;
+    }
 
     try {
-      const options = { mimeType: 'video/webm;codecs=vp9' };
+      // Try different codecs in order of preference
+      const codecs = [
+        'video/webm;codecs=vp9',
+        'video/webm;codecs=vp8',
+        'video/webm',
+        'video/mp4',
+      ];
+
+      let supportedMimeType = '';
+      for (const codec of codecs) {
+        if (MediaRecorder.isTypeSupported(codec)) {
+          supportedMimeType = codec;
+          break;
+        }
+      }
+
+      if (!supportedMimeType) {
+        recordingLog.error('[Recording] No supported video codec found. Tried:', codecs);
+        return;
+      }
+
+      recordingLog.debug('[Recording] Using codec:', supportedMimeType);
+      const options = { mimeType: supportedMimeType };
       const recorder = new MediaRecorder(streamRef.current, options);
 
       recorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
           recordedChunksRef.current.push(event.data);
+          recordingLog.debug('[Recording] Chunk captured, size:', event.data.size, 'total chunks:', recordedChunksRef.current.length);
         }
+      };
+
+      recorder.onerror = (event) => {
+        recordingLog.error('[Recording] MediaRecorder error:', event);
       };
 
       recorder.start(1000); // Capture in 1-second chunks
       mediaRecorderRef.current = recorder;
       recordingStartTimeRef.current = Date.now();
       setIsRecording(true);
+
+      recordingLog.debug('[Recording] ✅ Recording started successfully');
 
       // Start countdown display
       setRecordingTimeLeft(RECORDING_DURATION);
@@ -1612,6 +1649,7 @@ export default function LivePage() {
       }, 1000);
     } catch (err) {
       recordingLog.error('[Recording] Failed to start:', err);
+      recordingLog.error('[Recording] 💡 Hint: Check if MediaRecorder is supported and stream has video tracks');
     }
   }, []);
 
@@ -1629,6 +1667,8 @@ export default function LivePage() {
 
   // Finalize and save the incident recording (video only - incident already created)
   const finalizeIncidentRecording = useCallback(async () => {
+    recordingLog.debug('[Recording] Finalizing recording...');
+
     // Clear countdown interval
     if (recordingCountdownRef.current) {
       clearInterval(recordingCountdownRef.current);
@@ -1639,6 +1679,7 @@ export default function LivePage() {
     // Stop the recorder to get final chunks
     const recorder = mediaRecorderRef.current;
     if (recorder && recorder.state !== 'inactive') {
+      recordingLog.debug('[Recording] Stopping recorder, state:', recorder.state);
       await new Promise<void>((resolve) => {
         recorder.onstop = () => resolve();
         recorder.stop();
@@ -1650,21 +1691,44 @@ export default function LivePage() {
     const allChunks = [...recordedChunksRef.current];
     const incidentId = currentIncidentIdRef.current;
 
+    recordingLog.debug('[Recording] Finalized:', {
+      chunks: allChunks.length,
+      incidentId: incidentId?.slice(0, 8),
+    });
+
     // Reset for next incident
     recordedChunksRef.current = [];
     incidentStartConfidenceRef.current = 0;
     currentIncidentIdRef.current = null;
 
     if (allChunks.length === 0) {
+      recordingLog.warn('[Recording] No chunks recorded - nothing to upload');
       return;
     }
 
     const videoBlob = new Blob(allChunks, { type: 'video/webm' });
+    recordingLog.debug('[Recording] Video blob created, size:', videoBlob.size, 'bytes');
 
     // Upload video to storage and update the incident record
     if (incidentId && videoBlob.size > 0) {
+      recordingLog.debug('[Recording] 📤 Uploading video for incident:', incidentId.slice(0, 8));
       // Don't await - let upload happen in background
-      uploadIncidentVideo(incidentId, videoBlob);
+      uploadIncidentVideo(incidentId, videoBlob)
+        .then((url) => {
+          if (url) {
+            recordingLog.debug('[Recording] ✅ Video uploaded successfully:', url);
+          } else {
+            recordingLog.error('[Recording] ❌ Video upload returned null');
+          }
+        })
+        .catch((err) => {
+          recordingLog.error('[Recording] ❌ Video upload failed:', err);
+        });
+    } else {
+      recordingLog.warn('[Recording] Cannot upload - missing incidentId or empty blob', {
+        hasIncidentId: !!incidentId,
+        blobSize: videoBlob.size,
+      });
     }
   }, []);
 

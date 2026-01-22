@@ -1,12 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 const WHATSAPP_API_URL = 'https://api.4whats.net';
 
-// Create a Supabase client for server-side operations
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Lazy-initialize Supabase client to avoid build-time errors
+let supabase: SupabaseClient | null = null;
+
+function getSupabase(): SupabaseClient {
+  if (!supabase) {
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+    if (!supabaseUrl || !supabaseServiceKey) {
+      throw new Error('Supabase URL and key are required');
+    }
+
+    supabase = createClient(supabaseUrl, supabaseServiceKey);
+  }
+  return supabase;
+}
 
 interface SendMessageRequest {
   phone: string;
@@ -41,12 +53,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
 
     // Check for required environment variables (server-side only)
-    const instanceId = process.env.WHATSAPP_INSTANCE_ID;
-    const token = process.env.WHATSAPP_TOKEN;
+    // Fall back to NEXT_PUBLIC_ vars for backwards compatibility
+    const instanceId = process.env.WHATSAPP_INSTANCE_ID || process.env.NEXT_PUBLIC_WHATSAPP_INSTANCE_ID;
+    const token = process.env.WHATSAPP_TOKEN || process.env.NEXT_PUBLIC_WHATSAPP_TOKEN;
 
     if (!instanceId || !token) {
+      console.error('[WhatsApp API] Missing env vars. Required: WHATSAPP_INSTANCE_ID and WHATSAPP_TOKEN (or NEXT_PUBLIC_ variants)');
       return NextResponse.json(
-        { error: 'WhatsApp not configured on server' },
+        { error: 'WhatsApp not configured on server. Check WHATSAPP_INSTANCE_ID and WHATSAPP_TOKEN env vars.' },
         { status: 500 }
       );
     }
@@ -62,7 +76,7 @@ export async function POST(request: NextRequest) {
 
       // Check cooldown if userId is provided and not skipping cooldown
       if (alert.userId && !alert.skipCooldown) {
-        const { data: settings, error: settingsError } = await supabase
+        const { data: settings, error: settingsError } = await getSupabase()
           .from('alert_settings')
           .select('alert_cooldown_seconds, last_alert_sent_at')
           .eq('user_id', alert.userId)
@@ -151,7 +165,7 @@ https://nexaravision.com/alerts
     if (data.sent) {
       // Update last_alert_sent_at for incident alerts
       if ('incidentId' in body && body.userId) {
-        await supabase
+        await getSupabase()
           .from('alert_settings')
           .update({ last_alert_sent_at: new Date().toISOString() })
           .eq('user_id', body.userId);

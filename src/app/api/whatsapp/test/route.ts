@@ -25,16 +25,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const instanceId = process.env.WHATSAPP_INSTANCE_ID;
-    const token = process.env.WHATSAPP_TOKEN;
+    // Fall back to NEXT_PUBLIC_ vars for backwards compatibility
+    const instanceId = process.env.WHATSAPP_INSTANCE_ID || process.env.NEXT_PUBLIC_WHATSAPP_INSTANCE_ID;
+    const token = process.env.WHATSAPP_TOKEN || process.env.NEXT_PUBLIC_WHATSAPP_TOKEN;
 
     if (!instanceId || !token) {
+      console.error('[WhatsApp Test] Missing env vars. Required: WHATSAPP_INSTANCE_ID and WHATSAPP_TOKEN (or NEXT_PUBLIC_ variants)');
       return NextResponse.json(
         {
-          error: 'WhatsApp not configured on server',
+          error: 'WhatsApp not configured on server. Check WHATSAPP_INSTANCE_ID and WHATSAPP_TOKEN env vars.',
           details: {
             instanceId: instanceId ? 'SET' : 'MISSING',
             token: token ? 'SET' : 'MISSING',
+            hint: 'Set either WHATSAPP_* or NEXT_PUBLIC_WHATSAPP_* environment variables'
           }
         },
         { status: 500 }

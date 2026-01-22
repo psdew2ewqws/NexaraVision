@@ -1,10 +1,52 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { getSupabase } from '@/lib/supabase/client';
 import { validateIncidentData, clamp } from '@/lib/validation';
 import { DETECTION } from '@/constants/detection';
 import { createLogger, incidentLogger, cameraLogger, storageLogger, alertLogger } from '@/lib/logger';
+
+// ============================================
+// AUTH STATE HOOK - Fixes race condition where hooks
+// fetch data before auth session is hydrated
+// ============================================
+
+/**
+ * Hook that returns the current auth user ID and triggers re-renders
+ * when auth state changes. This fixes the race condition where data
+ * hooks would fetch with null user before session is restored.
+ */
+export function useAuthUserId() {
+  const [userId, setUserId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const supabaseClient = getSupabase();
+
+    // Get initial session
+    const getInitialSession = async () => {
+      const { data: { user } } = await supabaseClient.auth.getUser();
+      setUserId(user?.id ?? null);
+      setIsLoading(false);
+    };
+
+    getInitialSession();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(
+      (_event, session) => {
+        setUserId(session?.user?.id ?? null);
+        setIsLoading(false);
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  return { userId, isLoading };
+}
 
 // Module-specific loggers
 const throttleLog = createLogger('Throttle');
@@ -146,28 +188,29 @@ interface IncidentStatusUpdate {
   resolution_notes?: string;
 }
 
-// Fetch cameras
+// Fetch cameras - depends on auth state to fix race condition
 export function useCameras() {
+  const { userId, isLoading: authLoading } = useAuthUserId();
   const [cameras, setCameras] = useState<Camera[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Wait for auth to be determined
+    if (authLoading) return;
+
+    // If no user after auth loads, return empty
+    if (!userId) {
+      setError('Not authenticated');
+      setCameras([]);
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
 
     async function fetchData() {
       try {
-        // Check if user is authenticated first
-        const { data: authData } = await supabase.auth.getUser();
-        if (!authData?.user) {
-          if (mounted) {
-            setError('Not authenticated');
-            setCameras([]);
-            setLoading(false);
-          }
-          return;
-        }
-
         const { data, error: fetchError } = await supabase
           .from('cameras')
           .select('*, locations(name, name_ar)')
@@ -194,39 +237,41 @@ export function useCameras() {
       }
     }
 
+    setLoading(true);
     const timeoutId = setTimeout(fetchData, 100);
     return () => {
       mounted = false;
       clearTimeout(timeoutId);
     };
-  }, []);
+  }, [userId, authLoading]);
 
-  return { cameras, loading, error };
+  return { cameras, loading: loading || authLoading, error };
 }
 
-// Fetch incidents - simplified without realtime for stability
+// Fetch incidents - depends on auth state to fix race condition
 export function useIncidents(limit = 50) {
+  const { userId, isLoading: authLoading } = useAuthUserId();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
+    // Wait for auth to be determined
+    if (authLoading) return;
+
+    // If no user after auth loads, return empty
+    if (!userId) {
+      setError('Not authenticated');
+      setIncidents([]);
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
 
     async function fetchData() {
       try {
-        // Check if user is authenticated first
-        const { data: authData } = await supabase.auth.getUser();
-        if (!authData?.user) {
-          if (mounted) {
-            setError('Not authenticated');
-            setIncidents([]);
-            setLoading(false);
-          }
-          return;
-        }
-
         const { data, error: fetchError } = await supabase
           .from('incidents')
           .select('*, cameras(name, name_ar), locations(name, name_ar)')
@@ -247,7 +292,6 @@ export function useIncidents(limit = 50) {
       } catch (err: unknown) {
         if (!mounted) return;
         const error = err as Error;
-        // Ignore AbortError from component unmount
         if (error?.name === 'AbortError') {
           incidentLogger.debug('[useIncidents] Request aborted (component unmount)');
           return;
@@ -261,18 +305,17 @@ export function useIncidents(limit = 50) {
     }
 
     setLoading(true);
-    // Small delay to prevent rapid re-fetches
     const timeoutId = setTimeout(fetchData, 100);
 
     return () => {
       mounted = false;
       clearTimeout(timeoutId);
     };
-  }, [limit, refreshKey]);
+  }, [limit, refreshKey, userId, authLoading]);
 
   const refresh = () => setRefreshKey(k => k + 1);
 
-  return { incidents, loading, error, setIncidents, refresh };
+  return { incidents, loading: loading || authLoading, error, setIncidents, refresh };
 }
 
 // Pagination options for incidents
@@ -282,8 +325,9 @@ export interface PaginationOptions {
   status?: Incident['status'] | 'all';
 }
 
-// Paginated incidents hook with total count
+// Paginated incidents hook - depends on auth state to fix race condition
 export function useIncidentsPaginated(options: PaginationOptions) {
+  const { userId, isLoading: authLoading } = useAuthUserId();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -294,22 +338,22 @@ export function useIncidentsPaginated(options: PaginationOptions) {
   const offset = (page - 1) * pageSize;
 
   useEffect(() => {
+    // Wait for auth to be determined
+    if (authLoading) return;
+
+    // If no user after auth loads, return empty
+    if (!userId) {
+      setError('Not authenticated');
+      setIncidents([]);
+      setTotalCount(0);
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
 
     async function fetchData() {
       try {
-        // Check if user is authenticated first
-        const { data: authData } = await supabase.auth.getUser();
-        if (!authData?.user) {
-          if (mounted) {
-            setError('Not authenticated');
-            setIncidents([]);
-            setTotalCount(0);
-            setLoading(false);
-          }
-          return;
-        }
-
         // Build query
         let query = supabase
           .from('incidents')
@@ -358,14 +402,14 @@ export function useIncidentsPaginated(options: PaginationOptions) {
       mounted = false;
       clearTimeout(timeoutId);
     };
-  }, [page, pageSize, status, offset, refreshKey]);
+  }, [page, pageSize, status, offset, refreshKey, userId, authLoading]);
 
   const refresh = () => setRefreshKey(k => k + 1);
   const totalPages = Math.ceil(totalCount / pageSize);
 
   return {
     incidents,
-    loading,
+    loading: loading || authLoading,
     error,
     totalCount,
     totalPages,
@@ -414,8 +458,9 @@ export function useLocations() {
   return { locations, loading, error };
 }
 
-// Get dashboard stats
+// Get dashboard stats - depends on auth state to fix race condition
 export function useDashboardStats() {
+  const { userId, isLoading: authLoading } = useAuthUserId();
   const [stats, setStats] = useState({
     activeCameras: 0,
     totalCameras: 0,
@@ -427,6 +472,15 @@ export function useDashboardStats() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Wait for auth to be determined
+    if (authLoading) return;
+
+    // If no user after auth loads, return empty stats
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
     let mounted = true;
 
     async function fetchData() {
@@ -479,11 +533,12 @@ export function useDashboardStats() {
       }
     }
 
+    setLoading(true);
     fetchData();
     return () => { mounted = false; };
-  }, []);
+  }, [userId, authLoading]);
 
-  return { stats, loading };
+  return { stats, loading: loading || authLoading };
 }
 
 // Update incident status
@@ -610,6 +665,14 @@ async function uploadVideoToStorage(incidentId: string, videoBlob: Blob): Promis
 
     if (error) {
       storageLogger.error('[Storage] Video upload failed:', error.message);
+      // Provide helpful hints for common storage errors
+      if (error.message.includes('Bucket not found') || error.message.includes('bucket')) {
+        storageLogger.error('[Storage] 💡 Hint: Create a "recordings" bucket in Supabase Dashboard > Storage');
+      } else if (error.message.includes('policy') || error.message.includes('permission') || error.message.includes('RLS')) {
+        storageLogger.error('[Storage] 💡 Hint: Check RLS policies on the "recordings" bucket allow authenticated uploads');
+      } else if (error.message.includes('size') || error.message.includes('limit')) {
+        storageLogger.error('[Storage] 💡 Hint: Video file may exceed storage size limits. Size:', videoBlob.size, 'bytes');
+      }
       return null;
     }
 
