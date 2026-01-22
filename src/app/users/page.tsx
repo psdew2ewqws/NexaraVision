@@ -58,6 +58,11 @@ const translations = {
     noUsers: 'No users found',
     accessDenied: 'Access Denied',
     adminOnly: 'Only administrators can access this page',
+    actions: {
+      edit: 'Edit user',
+      delete: 'Delete user',
+    },
+    close: 'Close',
   },
   ar: {
     title: 'إدارة الفريق',
@@ -108,6 +113,11 @@ const translations = {
     noUsers: 'لا يوجد مستخدمين',
     accessDenied: 'الوصول مرفوض',
     adminOnly: 'يمكن للمدراء فقط الوصول إلى هذه الصفحة',
+    actions: {
+      edit: 'تعديل المستخدم',
+      delete: 'حذف المستخدم',
+    },
+    close: 'إغلاق',
   },
 };
 
@@ -473,6 +483,7 @@ export default function UsersPage() {
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => openEditModal(user)}
+                            aria-label={t.actions.edit}
                             className="p-2.5 sm:p-2 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-lg hover:bg-white/[0.06] active:bg-white/[0.1] text-slate-400 hover:text-white transition-colors flex items-center justify-center"
                           >
                             {Icons.edit}
@@ -482,6 +493,7 @@ export default function UsersPage() {
                               setSelectedUser(user);
                               setShowDeleteModal(true);
                             }}
+                            aria-label={t.actions.delete}
                             className="p-2.5 sm:p-2 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-lg hover:bg-red-500/10 active:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors flex items-center justify-center"
                             disabled={user.id === profile?.id}
                           >
@@ -523,6 +535,7 @@ export default function UsersPage() {
                     setShowEditModal(false);
                     resetForm();
                   }}
+                  aria-label={t.close}
                   className="p-2.5 min-h-[44px] min-w-[44px] rounded-lg hover:bg-white/[0.06] active:bg-white/[0.1] text-slate-400 hover:text-white transition-colors flex items-center justify-center active:scale-95"
                 >
                   {Icons.x}

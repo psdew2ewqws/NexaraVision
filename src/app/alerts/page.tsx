@@ -116,6 +116,7 @@ const translations = {
     noRecording: 'No recording available',
     error: 'Error loading alerts',
     violence: 'Violence Detected',
+    close: 'Close',
   },
   ar: {
     title: 'تنبيهات الأمان',
@@ -164,6 +165,7 @@ const translations = {
     noRecording: 'لا يوجد تسجيل',
     error: 'خطأ في تحميل التنبيهات',
     violence: 'كشف عنف',
+    close: 'إغلاق',
   },
 };
 
@@ -359,6 +361,7 @@ export default function AlertsPage() {
                     <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-white/[0.04]">
                       <button
                         onClick={() => { setSelectedIncident(incident); setShowModal(true); }}
+                        aria-label={t.actions.view}
                         className="flex items-center gap-1.5 px-3 py-2.5 min-h-[44px] bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white text-xs sm:text-sm rounded-lg transition-colors active:scale-95"
                       >
                         {Icons.eye}
@@ -416,6 +419,7 @@ export default function AlertsPage() {
                 <h2 className="text-base sm:text-lg font-medium text-white">{t.modal.title}</h2>
                 <button
                   onClick={() => setShowModal(false)}
+                  aria-label={t.close}
                   className="p-2.5 min-h-[44px] min-w-[44px] rounded-lg hover:bg-white/[0.06] active:bg-white/[0.1] text-slate-400 hover:text-white transition-colors active:scale-95 flex items-center justify-center"
                 >
                   {Icons.x}

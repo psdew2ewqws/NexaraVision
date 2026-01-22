@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/lib/utils';
@@ -27,7 +27,6 @@ import {
   CheckCircle,
   ChevronLeft,
   ChevronRight,
-  Image,
   Images,
   Trash2,
   Loader2,
@@ -56,6 +55,8 @@ const translations = {
     timeline: 'Incident Timeline',
     screenshotCount: 'screenshots captured',
     viewAll: 'View All',
+    previous: 'Previous',
+    next: 'Next',
     delete: 'Delete',
     deleteConfirm: 'Delete this incident?',
     deleteWarning: 'This will permanently delete this incident and all its media files.',
@@ -91,6 +92,8 @@ const translations = {
     timeline: 'الجدول الزمني للحادث',
     screenshotCount: 'لقطات ملتقطة',
     viewAll: 'عرض الكل',
+    previous: 'السابق',
+    next: 'التالي',
     delete: 'حذف',
     deleteConfirm: 'حذف هذا الحادث؟',
     deleteWarning: 'سيؤدي هذا إلى حذف هذا الحادث وجميع ملفات الوسائط الخاصة به نهائياً.',
@@ -384,7 +387,7 @@ export default function RecordingsPage() {
               </div>
               <div className="flex items-center gap-2">
                 {getStatusBadge(selectedRecording.status)}
-                <Button variant="ghost" size="sm" onClick={closeRecording} className="min-h-[44px] min-w-[44px] active:scale-95">
+                <Button variant="ghost" size="sm" onClick={closeRecording} aria-label={t.close} className="min-h-[44px] min-w-[44px] active:scale-95">
                   <X className="w-5 h-5" />
                 </Button>
               </div>
@@ -421,6 +424,7 @@ export default function RecordingsPage() {
                       <button
                         onClick={() => setCurrentScreenshotIndex((i) => Math.max(0, i - 1))}
                         disabled={currentScreenshotIndex === 0}
+                        aria-label={t.previous}
                         className="absolute left-1 sm:left-2 top-1/2 -translate-y-1/2 p-3 sm:p-2 min-w-[44px] min-h-[44px] rounded-full bg-black/50 hover:bg-black/70 active:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center"
                       >
                         <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
@@ -428,6 +432,7 @@ export default function RecordingsPage() {
                       <button
                         onClick={() => setCurrentScreenshotIndex((i) => Math.min(incidentMedia.screenshots.length - 1, i + 1))}
                         disabled={currentScreenshotIndex === incidentMedia.screenshots.length - 1}
+                        aria-label={t.next}
                         className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 p-3 sm:p-2 min-w-[44px] min-h-[44px] rounded-full bg-black/50 hover:bg-black/70 active:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center"
                       >
                         <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
