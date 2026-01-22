@@ -141,8 +141,31 @@ const translations = {
       title: 'Source',
       webcam: 'Webcam',
       screen: 'Screen Share',
-      screenUnavailable: 'Not available on mobile',
+      screenUnavailable: 'Use Screen Recording',
+      screenRecordingTip: 'Record your screen, then upload',
       upload: 'Video Upload',
+    },
+    screenRecordingGuide: {
+      title: 'Screen Recording Guide',
+      subtitle: 'Record your screen and upload for analysis',
+      iosTitle: 'iPhone/iPad',
+      iosSteps: [
+        'Open Control Center (swipe down from top-right)',
+        'Tap the Screen Recording button',
+        'Recording starts after 3-second countdown',
+        'Tap red status bar to stop recording',
+        'Video saves to Photos app',
+      ],
+      androidTitle: 'Android',
+      androidSteps: [
+        'Swipe down to open Quick Settings',
+        'Tap "Screen Record" tile',
+        'Tap "Start" to begin recording',
+        'Tap notification to stop recording',
+        'Video saves to Gallery/Files',
+      ],
+      uploadNow: 'Upload Recording',
+      close: 'Close',
     },
     detection: {
       title: 'Detection Mode',
@@ -203,8 +226,31 @@ const translations = {
       title: 'المصدر',
       webcam: 'كاميرا الويب',
       screen: 'مشاركة الشاشة',
-      screenUnavailable: 'غير متاح على الجوال',
+      screenUnavailable: 'استخدم تسجيل الشاشة',
+      screenRecordingTip: 'سجّل شاشتك ثم ارفع الفيديو',
       upload: 'رفع فيديو',
+    },
+    screenRecordingGuide: {
+      title: 'دليل تسجيل الشاشة',
+      subtitle: 'سجّل شاشتك وارفعها للتحليل',
+      iosTitle: 'آيفون/آيباد',
+      iosSteps: [
+        'افتح مركز التحكم (اسحب من أعلى اليمين)',
+        'اضغط على زر تسجيل الشاشة',
+        'يبدأ التسجيل بعد عد تنازلي 3 ثوانٍ',
+        'اضغط على الشريط الأحمر للإيقاف',
+        'يُحفظ الفيديو في تطبيق الصور',
+      ],
+      androidTitle: 'أندرويد',
+      androidSteps: [
+        'اسحب لأسفل لفتح الإعدادات السريعة',
+        'اضغط على "تسجيل الشاشة"',
+        'اضغط "بدء" لبدء التسجيل',
+        'اضغط على الإشعار للإيقاف',
+        'يُحفظ الفيديو في المعرض/الملفات',
+      ],
+      uploadNow: 'ارفع التسجيل',
+      close: 'إغلاق',
     },
     detection: {
       title: 'وضع الكشف',
@@ -268,6 +314,7 @@ export default function LivePage() {
   const [source, setSource] = useState<SourceType>('webcam');
   const [detectionMode, setDetectionMode] = useState<DetectionMode>('server');
   const [isActive, setIsActive] = useState(false);
+  const [showScreenRecordingGuide, setShowScreenRecordingGuide] = useState(false);
   const isActiveRef = useRef(false);  // Track isActive for closures (avoid stale closure bug)
   const [isMuted, setIsMuted] = useState(true);
   const [currentViolence, setCurrentViolence] = useState(0);
@@ -1968,37 +2015,47 @@ export default function LivePage() {
               <TextureCardContent className="space-y-2">
                 {[
                   { key: 'webcam', icon: Camera, label: t.sources.webcam },
-                  { key: 'screen', icon: Monitor, label: t.sources.screen, unavailableLabel: t.sources.screenUnavailable },
+                  { key: 'screen', icon: Monitor, label: t.sources.screen, mobileLabel: t.sources.screenUnavailable, mobileTip: t.sources.screenRecordingTip },
                   { key: 'upload', icon: Upload, label: t.sources.upload },
-                ].map(({ key, icon: Icon, label, unavailableLabel }) => {
-                  // MOBILE FIX: Disable screen share on mobile (not supported)
-                  const isScreenShareDisabled = key === 'screen' && !isScreenShareSupported;
+                ].map(({ key, icon: Icon, label, mobileLabel, mobileTip }) => {
+                  // MOBILE: Screen share shows recording guide instead
+                  const isMobileScreenOption = key === 'screen' && !isScreenShareSupported;
                   return (
                     <button
                       key={key}
                       onClick={() => {
-                        if (!isActive && !isScreenShareDisabled) {
+                        if (isActive) return;
+                        if (isMobileScreenOption) {
+                          // Show screen recording guide on mobile
+                          setShowScreenRecordingGuide(true);
+                        } else {
                           setSource(key as SourceType);
                           if (key === 'upload') fileInputRef.current?.click();
                         }
                       }}
-                      disabled={isActive || isScreenShareDisabled}
+                      disabled={isActive}
                       className={cn(
                         'w-full p-3 rounded-xl flex items-center gap-3 transition-all min-h-[48px] active:scale-[0.98]',
                         source === key
                           ? 'bg-red-600/20 border border-red-500/50 text-red-400'
-                          : 'bg-slate-800/50 border border-transparent text-slate-400 hover:bg-slate-700/50',
-                        (isActive || isScreenShareDisabled) && 'opacity-50 cursor-not-allowed'
+                          : isMobileScreenOption
+                            ? 'bg-purple-900/30 border border-purple-500/30 text-purple-400 hover:bg-purple-800/40'
+                            : 'bg-slate-800/50 border border-transparent text-slate-400 hover:bg-slate-700/50',
+                        isActive && 'opacity-50 cursor-not-allowed'
                       )}
                     >
                       <Icon className="w-5 h-5" />
-                      <div className="flex flex-col items-start">
-                        <span className="font-medium">{label}</span>
-                        {isScreenShareDisabled && unavailableLabel && (
-                          <span className="text-xs text-slate-500">{unavailableLabel}</span>
+                      <div className="flex flex-col items-start flex-1">
+                        <span className="font-medium">{isMobileScreenOption ? mobileLabel : label}</span>
+                        {isMobileScreenOption && mobileTip && (
+                          <span className="text-xs text-purple-400/70">{mobileTip}</span>
                         )}
                       </div>
-                      {source === key && <ChevronRight className={cn('w-4 h-4 ml-auto', isRTL && 'rotate-180')} />}
+                      {isMobileScreenOption ? (
+                        <ChevronRight className={cn('w-4 h-4', isRTL && 'rotate-180')} />
+                      ) : source === key ? (
+                        <ChevronRight className={cn('w-4 h-4', isRTL && 'rotate-180')} />
+                      ) : null}
                     </button>
                   );
                 })}
@@ -2515,6 +2572,98 @@ export default function LivePage() {
           </div>
         </div>
       </div>
+
+      {/* Screen Recording Guide Modal (Mobile) */}
+      <AnimatePresence>
+        {showScreenRecordingGuide && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            onClick={() => setShowScreenRecordingGuide(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-sm w-full max-h-[80vh] overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Monitor className="w-5 h-5 text-purple-400" />
+                  {t.screenRecordingGuide.title}
+                </h2>
+                <button
+                  onClick={() => setShowScreenRecordingGuide(false)}
+                  className="p-2 hover:bg-slate-800 rounded-lg transition-colors"
+                >
+                  <X className="w-5 h-5 text-slate-400" />
+                </button>
+              </div>
+
+              <p className="text-sm text-slate-400 mb-6">{t.screenRecordingGuide.subtitle}</p>
+
+              {/* iOS Instructions */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 bg-slate-800 rounded flex items-center justify-center text-xs">🍎</span>
+                  {t.screenRecordingGuide.iosTitle}
+                </h3>
+                <ol className="space-y-2">
+                  {t.screenRecordingGuide.iosSteps.map((step: string, idx: number) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-slate-400">
+                      <span className="w-5 h-5 bg-purple-900/50 text-purple-400 rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                        {idx + 1}
+                      </span>
+                      {step}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              {/* Android Instructions */}
+              <div className="mb-6">
+                <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2">
+                  <span className="w-6 h-6 bg-slate-800 rounded flex items-center justify-center text-xs">🤖</span>
+                  {t.screenRecordingGuide.androidTitle}
+                </h3>
+                <ol className="space-y-2">
+                  {t.screenRecordingGuide.androidSteps.map((step: string, idx: number) => (
+                    <li key={idx} className="flex items-start gap-2 text-sm text-slate-400">
+                      <span className="w-5 h-5 bg-green-900/50 text-green-400 rounded-full flex items-center justify-center text-xs flex-shrink-0 mt-0.5">
+                        {idx + 1}
+                      </span>
+                      {step}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowScreenRecordingGuide(false);
+                    fileInputRef.current?.click();
+                  }}
+                  className="flex-1 py-3 px-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <Upload className="w-4 h-4" />
+                  {t.screenRecordingGuide.uploadNow}
+                </button>
+                <button
+                  onClick={() => setShowScreenRecordingGuide(false)}
+                  className="py-3 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium transition-colors"
+                >
+                  {t.screenRecordingGuide.close}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
