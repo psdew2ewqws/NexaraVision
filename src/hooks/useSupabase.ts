@@ -1404,6 +1404,7 @@ export async function sendWhatsAppAlerts(alertData: IncidentAlertData): Promise<
             confidence: alertData.confidence,
             timestamp: alertData.timestamp,
           }),
+          keepalive: true, // Ensure request completes even if page navigates away
         });
 
         const result = await response.json();
