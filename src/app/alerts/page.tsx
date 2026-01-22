@@ -286,10 +286,10 @@ export default function AlertsPage() {
               key={status}
               onClick={() => setFilter(status)}
               className={cn(
-                'px-3 sm:px-4 py-2 min-h-[40px] rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors active:scale-95',
+                'px-3 sm:px-4 py-2.5 min-h-[44px] rounded-lg text-xs sm:text-sm font-medium whitespace-nowrap transition-colors active:scale-95 active:bg-blue-700',
                 filter === status
                   ? 'bg-blue-600 text-white'
-                  : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800 hover:text-white'
+                  : 'bg-slate-800/50 text-slate-400 hover:bg-slate-800 hover:text-white active:bg-slate-700'
               )}
             >
               {status === 'all' ? t.filters.all : t.status[status as keyof typeof t.status]}
@@ -359,7 +359,7 @@ export default function AlertsPage() {
                     <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-white/[0.04]">
                       <button
                         onClick={() => { setSelectedIncident(incident); setShowModal(true); }}
-                        className="flex items-center gap-1.5 px-3 py-2 min-h-[40px] bg-slate-800 hover:bg-slate-700 text-white text-xs sm:text-sm rounded-lg transition-colors active:scale-95"
+                        className="flex items-center gap-1.5 px-3 py-2.5 min-h-[44px] bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-white text-xs sm:text-sm rounded-lg transition-colors active:scale-95"
                       >
                         {Icons.eye}
                         <span className="hidden sm:inline">{t.actions.view}</span>
@@ -370,14 +370,14 @@ export default function AlertsPage() {
                           <button
                             onClick={() => handleStatusUpdate(incident.id, 'acknowledged')}
                             disabled={updatingId === incident.id}
-                            className="flex items-center gap-1.5 px-3 py-2 min-h-[40px] bg-orange-600/20 hover:bg-orange-600/30 text-orange-400 text-xs sm:text-sm rounded-lg transition-colors disabled:opacity-50 active:scale-95"
+                            className="flex items-center gap-1.5 px-3 py-2.5 min-h-[44px] bg-orange-600/20 hover:bg-orange-600/30 active:bg-orange-600/40 text-orange-400 text-xs sm:text-sm rounded-lg transition-colors disabled:opacity-50 active:scale-95"
                           >
                             {t.actions.acknowledge}
                           </button>
                           <button
                             onClick={() => handleStatusUpdate(incident.id, 'resolved')}
                             disabled={updatingId === incident.id}
-                            className="flex items-center gap-1.5 px-3 py-2 min-h-[40px] bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-xs sm:text-sm rounded-lg transition-colors disabled:opacity-50 active:scale-95"
+                            className="flex items-center gap-1.5 px-3 py-2.5 min-h-[44px] bg-emerald-600/20 hover:bg-emerald-600/30 active:bg-emerald-600/40 text-emerald-400 text-xs sm:text-sm rounded-lg transition-colors disabled:opacity-50 active:scale-95"
                           >
                             {t.actions.resolve}
                           </button>
@@ -388,7 +388,7 @@ export default function AlertsPage() {
                         <button
                           onClick={() => handleStatusUpdate(incident.id, 'resolved')}
                           disabled={updatingId === incident.id}
-                          className="flex items-center gap-1.5 px-3 py-2 min-h-[40px] bg-emerald-600/20 hover:bg-emerald-600/30 text-emerald-400 text-xs sm:text-sm rounded-lg transition-colors disabled:opacity-50 active:scale-95"
+                          className="flex items-center gap-1.5 px-3 py-2.5 min-h-[44px] bg-emerald-600/20 hover:bg-emerald-600/30 active:bg-emerald-600/40 text-emerald-400 text-xs sm:text-sm rounded-lg transition-colors disabled:opacity-50 active:scale-95"
                         >
                           {t.actions.resolve}
                         </button>
@@ -416,7 +416,7 @@ export default function AlertsPage() {
                 <h2 className="text-base sm:text-lg font-medium text-white">{t.modal.title}</h2>
                 <button
                   onClick={() => setShowModal(false)}
-                  className="p-2 min-h-[40px] min-w-[40px] rounded-lg hover:bg-white/[0.06] text-slate-400 hover:text-white transition-colors active:scale-95 flex items-center justify-center"
+                  className="p-2.5 min-h-[44px] min-w-[44px] rounded-lg hover:bg-white/[0.06] active:bg-white/[0.1] text-slate-400 hover:text-white transition-colors active:scale-95 flex items-center justify-center"
                 >
                   {Icons.x}
                 </button>

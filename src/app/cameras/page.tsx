@@ -246,16 +246,16 @@ export default function RecordingsPage() {
         {/* Tabs - Scrollable on mobile */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="bg-slate-900 border border-slate-800 w-full sm:w-auto overflow-x-auto flex-nowrap">
-            <TabsTrigger value="all" className="data-[state=active]:bg-slate-800 min-h-[40px] text-xs sm:text-sm whitespace-nowrap">
+            <TabsTrigger value="all" className="data-[state=active]:bg-slate-800 min-h-[44px] text-xs sm:text-sm whitespace-nowrap">
               {t.all} ({counts.all})
             </TabsTrigger>
-            <TabsTrigger value="detected" className="data-[state=active]:bg-slate-800 min-h-[40px] text-xs sm:text-sm whitespace-nowrap">
+            <TabsTrigger value="detected" className="data-[state=active]:bg-slate-800 min-h-[44px] text-xs sm:text-sm whitespace-nowrap">
               {t.detected} ({counts.detected})
             </TabsTrigger>
-            <TabsTrigger value="resolved" className="data-[state=active]:bg-slate-800 min-h-[40px] text-xs sm:text-sm whitespace-nowrap">
+            <TabsTrigger value="resolved" className="data-[state=active]:bg-slate-800 min-h-[44px] text-xs sm:text-sm whitespace-nowrap">
               {t.resolved} ({counts.resolved})
             </TabsTrigger>
-            <TabsTrigger value="false_positive" className="data-[state=active]:bg-slate-800 min-h-[40px] text-xs sm:text-sm whitespace-nowrap">
+            <TabsTrigger value="false_positive" className="data-[state=active]:bg-slate-800 min-h-[44px] text-xs sm:text-sm whitespace-nowrap">
               {t.falsePositive} ({counts.false_positive})
             </TabsTrigger>
           </TabsList>
@@ -362,7 +362,7 @@ export default function RecordingsPage() {
               </div>
               <div className="flex items-center gap-2">
                 {getStatusBadge(selectedRecording.status)}
-                <Button variant="ghost" size="sm" onClick={() => setSelectedRecording(null)} className="min-h-[40px] min-w-[40px] active:scale-95">
+                <Button variant="ghost" size="sm" onClick={() => setSelectedRecording(null)} className="min-h-[44px] min-w-[44px] active:scale-95">
                   <X className="w-5 h-5" />
                 </Button>
               </div>
