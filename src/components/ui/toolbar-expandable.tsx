@@ -304,7 +304,7 @@ export function NumberSetting({
           max={max}
           value={value}
           onChange={(e) => onChange(Number(e.target.value))}
-          className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-zinc-600"
+          className="w-full px-3 py-2.5 min-h-[44px] bg-zinc-800 border border-zinc-700 rounded-lg text-white text-sm focus:outline-none focus:ring-1 focus:ring-zinc-600"
         />
         {unit && <span className="text-zinc-400 text-sm">{unit}</span>}
       </div>
@@ -327,8 +327,8 @@ export function ToggleSetting({
   onChange,
 }: ToggleSettingProps) {
   return (
-    <div className="flex items-center justify-between py-2">
-      <div>
+    <div className="flex items-center justify-between py-2 min-h-[44px]">
+      <div className="flex-1 pr-3">
         <p className="text-sm font-medium text-white">{label}</p>
         {description && (
           <p className="text-xs text-zinc-500 mt-0.5">{description}</p>
@@ -337,12 +337,12 @@ export function ToggleSetting({
       <button
         onClick={() => onChange(!checked)}
         className={cn(
-          "relative h-6 w-11 rounded-full transition-colors",
+          "relative h-7 w-12 rounded-full transition-colors flex-shrink-0 active:scale-95",
           checked ? "bg-blue-500" : "bg-zinc-700"
         )}
       >
         <motion.div
-          className="absolute top-1 left-1 h-4 w-4 rounded-full bg-white"
+          className="absolute top-1 left-1 h-5 w-5 rounded-full bg-white shadow-sm"
           animate={{ x: checked ? 20 : 0 }}
           transition={transition}
         />

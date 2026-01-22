@@ -647,7 +647,7 @@ export default function SettingsPage() {
                   onChange={(e) => handlePhoneChange(e.target.value)}
                   placeholder={t.whatsapp.phonePlaceholder}
                   className={cn(
-                    "flex-1 px-3 py-2 rounded-lg text-sm",
+                    "flex-1 px-3 py-2 min-h-[44px] rounded-lg text-sm",
                     "bg-zinc-800 text-white",
                     "placeholder:text-zinc-500",
                     "focus:outline-none focus:ring-2 focus:ring-emerald-500/50",
@@ -662,8 +662,8 @@ export default function SettingsPage() {
                   onClick={handleWhatsAppSave}
                   disabled={alertSaving || !whatsappPhone || !!whatsappPhoneError}
                   className={cn(
-                    "px-4 py-2 rounded-lg text-sm font-medium transition-all",
-                    "bg-zinc-700 text-white hover:bg-zinc-600",
+                    "px-4 py-2 min-h-[44px] rounded-lg text-sm font-medium transition-all active:scale-95",
+                    "bg-zinc-700 text-white hover:bg-zinc-600 active:bg-zinc-500",
                     "disabled:opacity-50 disabled:cursor-not-allowed"
                   )}
                 >
@@ -682,12 +682,12 @@ export default function SettingsPage() {
                   onClick={handleWhatsAppTest}
                   disabled={whatsappTesting || !whatsappPhone || !!whatsappPhoneError}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all",
+                    "flex items-center gap-2 px-4 py-2 min-h-[44px] rounded-lg text-sm font-medium transition-all active:scale-95",
                     whatsappTestResult === 'success'
                       ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
                       : whatsappTestResult === 'failed'
                       ? "bg-red-500/20 text-red-400 border border-red-500/30"
-                      : "bg-emerald-600 text-white hover:bg-emerald-500",
+                      : "bg-emerald-600 text-white hover:bg-emerald-500 active:bg-emerald-400",
                     "disabled:opacity-50 disabled:cursor-not-allowed"
                   )}
                 >
@@ -752,10 +752,10 @@ export default function SettingsPage() {
                     onClick={() => handleCooldownChange(seconds)}
                     disabled={!user}
                     className={cn(
-                      "px-3 py-2 rounded-lg text-sm font-medium transition-all",
+                      "px-3 py-2 min-h-[44px] rounded-lg text-sm font-medium transition-all active:scale-95",
                       (alertSettings?.alert_cooldown_seconds || 60) === seconds
                         ? "bg-emerald-600 text-white ring-2 ring-emerald-500/50"
-                        : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white",
+                        : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700 hover:text-white active:bg-zinc-600",
                       "disabled:opacity-50 disabled:cursor-not-allowed"
                     )}
                   >
@@ -782,10 +782,10 @@ export default function SettingsPage() {
               <button
                 onClick={() => setLocale('en')}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-sm transition-colors",
+                  "px-4 py-2 min-h-[44px] rounded-lg text-sm transition-colors active:scale-95",
                   locale === 'en'
                     ? "bg-zinc-700 text-white"
-                    : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-800 active:bg-zinc-700"
                 )}
               >
                 English
@@ -793,10 +793,10 @@ export default function SettingsPage() {
               <button
                 onClick={() => setLocale('ar')}
                 className={cn(
-                  "px-3 py-1.5 rounded-lg text-sm transition-colors",
+                  "px-4 py-2 min-h-[44px] rounded-lg text-sm transition-colors active:scale-95",
                   locale === 'ar'
                     ? "bg-zinc-700 text-white"
-                    : "text-zinc-400 hover:text-white hover:bg-zinc-800"
+                    : "text-zinc-400 hover:text-white hover:bg-zinc-800 active:bg-zinc-700"
                 )}
               >
                 العربية
