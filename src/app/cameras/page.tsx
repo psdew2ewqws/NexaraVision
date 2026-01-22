@@ -294,11 +294,11 @@ export default function RecordingsPage() {
                           <Video className="w-12 h-12" />
                         </div>
                       )}
-                      {/* Play overlay */}
+                      {/* Play overlay - always visible on mobile, hover on desktop */}
                       {incident.video_url && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 hover:opacity-100 transition-opacity">
-                          <div className="w-14 h-14 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
-                            <Play className="w-8 h-8 text-white ml-1" />
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-100 sm:opacity-0 sm:hover:opacity-100 sm:group-focus:opacity-100 transition-opacity">
+                          <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-full bg-white/20 backdrop-blur flex items-center justify-center">
+                            <Play className="w-6 h-6 sm:w-8 sm:h-8 text-white ml-0.5 sm:ml-1" />
                           </div>
                         </div>
                       )}
@@ -399,19 +399,19 @@ export default function RecordingsPage() {
                       <button
                         onClick={() => setCurrentScreenshotIndex((i) => Math.max(0, i - 1))}
                         disabled={currentScreenshotIndex === 0}
-                        className="absolute left-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        className="absolute left-1 sm:left-2 top-1/2 -translate-y-1/2 p-3 sm:p-2 min-w-[44px] min-h-[44px] rounded-full bg-black/50 hover:bg-black/70 active:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center"
                       >
-                        <ChevronLeft className="w-6 h-6 text-white" />
+                        <ChevronLeft className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                       </button>
                       <button
                         onClick={() => setCurrentScreenshotIndex((i) => Math.min(incidentMedia.screenshots.length - 1, i + 1))}
                         disabled={currentScreenshotIndex === incidentMedia.screenshots.length - 1}
-                        className="absolute right-2 top-1/2 -translate-y-1/2 p-2 rounded-full bg-black/50 hover:bg-black/70 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+                        className="absolute right-1 sm:right-2 top-1/2 -translate-y-1/2 p-3 sm:p-2 min-w-[44px] min-h-[44px] rounded-full bg-black/50 hover:bg-black/70 active:bg-black/80 disabled:opacity-30 disabled:cursor-not-allowed transition-all flex items-center justify-center"
                       >
-                        <ChevronRight className="w-6 h-6 text-white" />
+                        <ChevronRight className="w-5 h-5 sm:w-6 sm:h-6 text-white" />
                       </button>
                       {/* Screenshot counter */}
-                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 backdrop-blur text-white text-sm">
+                      <div className="absolute bottom-4 left-1/2 -translate-x-1/2 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur text-white text-xs sm:text-sm">
                         {currentScreenshotIndex + 1} / {incidentMedia.screenshots.length}
                       </div>
                     </>

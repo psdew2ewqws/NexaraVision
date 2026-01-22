@@ -344,17 +344,17 @@ export default function UsersPage() {
   }
 
   return (
-    <div className={cn('min-h-screen bg-slate-950 p-6', isRTL && 'rtl')}>
-      <div className="max-w-7xl mx-auto space-y-6">
+    <div className={cn('min-h-screen bg-slate-950 p-3 sm:p-6', isRTL && 'rtl')}>
+      <div className="max-w-7xl mx-auto space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-white">{t.title}</h1>
-            <p className="text-slate-400 text-sm mt-1">{t.subtitle}</p>
+            <h1 className="text-xl sm:text-2xl font-semibold text-white">{t.title}</h1>
+            <p className="text-slate-400 text-xs sm:text-sm mt-1">{t.subtitle}</p>
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-lg font-medium transition-colors"
+            className="flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-blue-600 hover:bg-blue-500 active:bg-blue-700 text-white rounded-lg font-medium transition-colors"
           >
             {Icons.userPlus}
             {t.addUser}
@@ -417,63 +417,63 @@ export default function UsersPage() {
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full min-w-[640px]">
                 <thead>
                   <tr className="border-b border-white/[0.06]">
-                    <th className="text-left p-4 text-sm font-medium text-slate-400">{t.table.user}</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-400">{t.table.role}</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-400">{t.table.contact}</th>
-                    <th className="text-left p-4 text-sm font-medium text-slate-400">{t.table.joined}</th>
-                    <th className="text-right p-4 text-sm font-medium text-slate-400">{t.table.actions}</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-medium text-slate-400">{t.table.user}</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-medium text-slate-400">{t.table.role}</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-medium text-slate-400 hidden sm:table-cell">{t.table.contact}</th>
+                    <th className="text-left p-2 sm:p-4 text-xs sm:text-sm font-medium text-slate-400 hidden md:table-cell">{t.table.joined}</th>
+                    <th className="text-right p-2 sm:p-4 text-xs sm:text-sm font-medium text-slate-400">{t.table.actions}</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.map((user) => (
-                    <tr key={user.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
-                      <td className="p-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium text-sm">
+                    <tr key={user.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors">
+                      <td className="p-2 sm:p-4">
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium text-xs sm:text-sm flex-shrink-0">
                             {user.full_name?.[0] || user.email[0].toUpperCase()}
                           </div>
-                          <div>
-                            <div className="text-white font-medium">
+                          <div className="min-w-0">
+                            <div className="text-white font-medium text-sm sm:text-base truncate">
                               {locale === 'ar' && user.full_name_ar ? user.full_name_ar : user.full_name || 'No Name'}
                             </div>
-                            <div className="text-sm text-slate-500">{user.email}</div>
+                            <div className="text-xs sm:text-sm text-slate-500 truncate">{user.email}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="p-4">
-                        <span className={cn('inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-sm font-medium', roleColors[user.role])}>
+                      <td className="p-2 sm:p-4">
+                        <span className={cn('inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1 rounded-md border text-xs sm:text-sm font-medium', roleColors[user.role])}>
                           {roleIcons[user.role]}
-                          {t.roles[user.role]}
+                          <span className="hidden sm:inline">{t.roles[user.role]}</span>
                         </span>
                       </td>
-                      <td className="p-4">
+                      <td className="p-2 sm:p-4 hidden sm:table-cell">
                         <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-sm text-slate-300">
+                          <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-300">
                             <span className="text-slate-500">{Icons.mail}</span>
-                            {user.email}
+                            <span className="truncate max-w-[150px]">{user.email}</span>
                           </div>
                           {user.phone && (
-                            <div className="flex items-center gap-2 text-sm text-slate-400">
+                            <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-400">
                               <span className="text-slate-500">{Icons.phone}</span>
                               {user.phone}
                             </div>
                           )}
                         </div>
                       </td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2 text-sm text-slate-400">
+                      <td className="p-2 sm:p-4 hidden md:table-cell">
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-slate-400">
                           <span className="text-slate-500">{Icons.clock}</span>
                           {formatDate(user.created_at)}
                         </div>
                       </td>
-                      <td className="p-4">
+                      <td className="p-2 sm:p-4">
                         <div className="flex items-center justify-end gap-1">
                           <button
                             onClick={() => openEditModal(user)}
-                            className="p-2 rounded-lg hover:bg-white/[0.06] text-slate-400 hover:text-white transition-colors"
+                            className="p-2.5 sm:p-2 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-lg hover:bg-white/[0.06] active:bg-white/[0.1] text-slate-400 hover:text-white transition-colors flex items-center justify-center"
                           >
                             {Icons.edit}
                           </button>
@@ -482,7 +482,7 @@ export default function UsersPage() {
                               setSelectedUser(user);
                               setShowDeleteModal(true);
                             }}
-                            className="p-2 rounded-lg hover:bg-red-500/10 text-slate-400 hover:text-red-400 transition-colors"
+                            className="p-2.5 sm:p-2 min-w-[44px] min-h-[44px] sm:min-w-0 sm:min-h-0 rounded-lg hover:bg-red-500/10 active:bg-red-500/20 text-slate-400 hover:text-red-400 transition-colors flex items-center justify-center"
                             disabled={user.id === profile?.id}
                           >
                             {Icons.trash}
