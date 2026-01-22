@@ -11,6 +11,7 @@ export interface WebSocketMessage {
   type: 'analyze_frames' | 'ping' | 'subscribe' | 'unsubscribe';
   frames?: string[];
   cameraId?: string;
+  userId?: string;
   metadata?: Record<string, unknown>;
 }
 
@@ -43,6 +44,7 @@ export class DetectionWebSocket {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private isManualClose = false;
+  private userId: string | null = null;
 
   private config: Required<WebSocketConfig>;
   private eventHandlers: WebSocketEventHandler[] = [];
@@ -168,6 +170,21 @@ export class DetectionWebSocket {
   }
 
   /**
+   * Set user ID for per-user model configuration
+   */
+  public setUserId(userId: string | null): void {
+    this.userId = userId;
+    log.debug(`[WebSocket] User ID set to: ${userId || 'anonymous'}`);
+  }
+
+  /**
+   * Get current user ID
+   */
+  public getUserId(): string | null {
+    return this.userId;
+  }
+
+  /**
    * Send frames for analysis
    */
   public analyzeFrames(frames: string[], cameraId?: string): void {
@@ -180,6 +197,7 @@ export class DetectionWebSocket {
       type: 'analyze_frames',
       frames,
       cameraId,
+      userId: this.userId || undefined,
       metadata: {
         timestamp: Date.now(),
         frameCount: frames.length,

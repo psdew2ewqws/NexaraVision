@@ -8,6 +8,7 @@ import { wsLogger as log } from '@/lib/logger';
 
 export interface UseWebSocketOptions {
   autoConnect?: boolean;
+  userId?: string | null;
   onDetection?: (result: DetectionResult) => void;
   onError?: (error: Error) => void;
 }
@@ -23,7 +24,7 @@ export interface UseWebSocketReturn {
 }
 
 export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketReturn {
-  const { autoConnect = false, onDetection, onError } = options;
+  const { autoConnect = false, userId = null, onDetection, onError } = options;
 
   const wsRef = useRef<DetectionWebSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
@@ -34,6 +35,11 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   const connect = useCallback(async () => {
     if (!wsRef.current) {
       wsRef.current = new DetectionWebSocket();
+
+      // Set user ID for per-user model configuration
+      if (userId) {
+        wsRef.current.setUserId(userId);
+      }
 
       // Register event handlers
       wsRef.current.onDetection((result) => {
@@ -50,6 +56,9 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
         setStatus(newStatus);
         setIsConnected(newStatus === 'connected');
       });
+    } else if (userId) {
+      // Update user ID if already connected
+      wsRef.current.setUserId(userId);
     }
 
     try {
@@ -58,7 +67,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
       log.error('Failed to connect WebSocket:', err);
       throw err;
     }
-  }, [onDetection, onError]);
+  }, [userId, onDetection, onError]);
 
   const disconnect = useCallback(() => {
     if (wsRef.current) {
