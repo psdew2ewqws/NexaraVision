@@ -52,6 +52,8 @@ import {
   type Location,
 } from '@/hooks/useSupabase';
 import { useDetectionSettings } from '@/hooks/useDetectionSettings';
+import { useAlertSettings } from '@/hooks/useAlertSettings';
+import { useAuth } from '@/contexts/AuthContext';
 
 // Types
 type SourceType = 'webcam' | 'screen' | 'upload';
@@ -288,6 +290,12 @@ export default function LivePage() {
 
   // Detection settings from Supabase (per-user) with localStorage fallback
   const { settings: detectionSettings, isLoading: settingsLoading, isAuthenticated: settingsAuthenticated } = useDetectionSettings();
+
+  // Auth context for user ID
+  const { user } = useAuth();
+
+  // Alert settings for WhatsApp notifications
+  const { settings: alertSettings } = useAlertSettings(user?.id);
 
   // Camera tracking for incident creation
   const [activeCamera, setActiveCamera] = useState<CameraRecord | null>(null);
@@ -935,6 +943,34 @@ export default function LivePage() {
       if (incident) {
         currentIncidentIdRef.current = incident.id;
         setDbError(null); // Clear any previous error
+
+        // Send WhatsApp alert if enabled
+        if (alertSettings?.whatsapp_enabled && alertSettings?.whatsapp_number && user?.id) {
+          console.log('[WhatsApp] Sending violence alert to:', alertSettings.whatsapp_number);
+          fetch('/api/whatsapp/send', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              phone: alertSettings.whatsapp_number,
+              userId: user.id,
+              incidentId: incident.id,
+              cameraName: camera?.name || 'Browser Camera',
+              locationName: location?.name || 'Unknown Location',
+              confidence: Math.round(confidence),
+              timestamp: new Date().toISOString(),
+            }),
+          }).then(res => res.json())
+            .then(data => {
+              if (data.success) {
+                console.log('[WhatsApp] Alert sent successfully:', data.id);
+              } else if (data.cooldownActive) {
+                console.log('[WhatsApp] Cooldown active, skipped alert');
+              } else {
+                console.error('[WhatsApp] Failed to send alert:', data.error);
+              }
+            })
+            .catch(err => console.error('[WhatsApp] Error sending alert:', err));
+        }
       } else if (error) {
         console.error('[Incident] ❌ Failed to create:', error);
         const errMsg = (error as { message?: string; code?: string })?.message || 'Unknown error';
@@ -961,19 +997,10 @@ export default function LivePage() {
       }]);
     }
 
-    // Start recording if not already (ONLY ONCE per incident - don't reset timer)
-    if (detectionSettings.auto_record && streamRef.current) {
-      // Only start recording if not already recording
-      // DON'T reset the timer - record once and finalize after 1 minute
-      if (!mediaRecorderRef.current) {
-        startIncidentRecording();
-        // Start the finalization timer ONLY when starting new recording
-        triggerRecordingReset(confidence);
-      }
-      // Track peak confidence during recording (but don't reset timer)
-      if (confidence > incidentStartConfidenceRef.current) {
-        incidentStartConfidenceRef.current = confidence;
-      }
+    // Start recording ONCE per incident (no timer reset on re-trigger)
+    if (detectionSettings.auto_record && streamRef.current && !mediaRecorderRef.current) {
+      startIncidentRecording();
+      startRecordingTimer(confidence);
     }
 
     if (fightAlertTimeoutRef.current) {
@@ -1382,22 +1409,12 @@ export default function LivePage() {
     }
   }, []);
 
-  // Reset the recording timer (called on each violence trigger)
-  const triggerRecordingReset = useCallback((confidence: number) => {
-    // Clear existing timeout
-    if (recordingTimeoutRef.current) {
-      clearTimeout(recordingTimeoutRef.current);
-    }
+  // Start the recording finalization timer (called ONCE when recording starts)
+  const startRecordingTimer = useCallback((confidence: number) => {
+    // Track the starting confidence
+    incidentStartConfidenceRef.current = confidence;
 
-    // Track the highest confidence during this incident
-    if (confidence > incidentStartConfidenceRef.current) {
-      incidentStartConfidenceRef.current = confidence;
-    }
-
-    // Reset countdown display
-    setRecordingTimeLeft(RECORDING_DURATION);
-
-    // Set new timeout to save after 1 minute of no new violence
+    // Set timeout to finalize after RECORDING_DURATION (NO reset on re-trigger)
     recordingTimeoutRef.current = setTimeout(() => {
       finalizeIncidentRecording();
     }, RECORDING_DURATION * 1000);
