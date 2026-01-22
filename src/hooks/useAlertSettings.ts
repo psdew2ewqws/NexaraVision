@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getSupabase } from '@/lib/supabase/client';
 import { AlertSettings } from '@/types/database';
+import { alertLogger as log } from '@/lib/logger';
 
 const supabase = getSupabase();
 
@@ -31,7 +32,7 @@ export function useAlertSettings(userId: string | undefined) {
 
   const fetchSettings = useCallback(async () => {
     if (!userId) {
-      console.log('[AlertSettings] No userId, skipping fetch');
+      log.debug('[AlertSettings] No userId, skipping fetch');
       setLoading(false);
       return;
     }
@@ -39,7 +40,7 @@ export function useAlertSettings(userId: string | undefined) {
     try {
       setLoading(true);
       setError(null);
-      console.log('[AlertSettings] Fetching settings for user:', userId);
+      log.debug('[AlertSettings] Fetching settings for user:', userId);
 
       const { data, error: fetchError } = await supabase
         .from('alert_settings')
@@ -48,11 +49,11 @@ export function useAlertSettings(userId: string | undefined) {
         .single();
 
       if (fetchError) {
-        console.log('[AlertSettings] Fetch error code:', fetchError.code, fetchError.message);
+        log.debug('[AlertSettings] Fetch error code:', fetchError.code, fetchError.message);
 
         // If no settings exist, create default settings
         if (fetchError.code === 'PGRST116') {
-          console.log('[AlertSettings] No settings found, creating defaults...');
+          log.debug('[AlertSettings] No settings found, creating defaults...');
           const defaultSettings = {
             user_id: userId,
             ...DEFAULT_ALERT_SETTINGS,
@@ -65,7 +66,7 @@ export function useAlertSettings(userId: string | undefined) {
             .single();
 
           if (insertError) {
-            console.error('[AlertSettings] Failed to create defaults:', insertError);
+            log.error('[AlertSettings] Failed to create defaults:', insertError);
             // Still set local defaults so UI works
             setSettings({
               id: 'local-fallback',
@@ -76,11 +77,11 @@ export function useAlertSettings(userId: string | undefined) {
             } as AlertSettings);
             setError('Settings saved locally (DB sync failed)');
           } else {
-            console.log('[AlertSettings] Created default settings:', newData);
+            log.debug('[AlertSettings] Created default settings:', newData);
             setSettings(newData);
           }
         } else {
-          console.error('[AlertSettings] Fetch error:', fetchError);
+          log.error('[AlertSettings] Fetch error:', fetchError);
           // Set local defaults so UI still works
           setSettings({
             id: 'local-fallback',
@@ -92,11 +93,11 @@ export function useAlertSettings(userId: string | undefined) {
           setError('Using local settings (DB unavailable)');
         }
       } else {
-        console.log('[AlertSettings] Loaded settings:', data);
+        log.debug('[AlertSettings] Loaded settings:', data);
         setSettings(data);
       }
     } catch (err) {
-      console.error('[AlertSettings] Error:', err);
+      log.error('[AlertSettings] Error:', err);
       // Set local defaults so UI still works
       if (userId) {
         setSettings({
@@ -119,7 +120,7 @@ export function useAlertSettings(userId: string | undefined) {
 
   const updateSettings = async (updates: Partial<AlertSettings>): Promise<boolean> => {
     if (!userId) {
-      console.log('[AlertSettings] No userId, cannot update');
+      log.debug('[AlertSettings] No userId, cannot update');
       setError('Please sign in to save settings');
       return false;
     }
@@ -133,17 +134,17 @@ export function useAlertSettings(userId: string | undefined) {
 
       // Check auth status
       const { data: { session } } = await supabase.auth.getSession();
-      console.log('[AlertSettings] Session check:', session ? 'authenticated' : 'NOT authenticated');
-      console.log('[AlertSettings] User ID:', userId);
-      console.log('[AlertSettings] Session user ID:', session?.user?.id);
+      log.debug('[AlertSettings] Session check:', session ? 'authenticated' : 'NOT authenticated');
+      log.debug('[AlertSettings] User ID:', userId);
+      log.debug('[AlertSettings] Session user ID:', session?.user?.id);
 
       if (!session) {
-        console.error('[AlertSettings] No active session!');
+        log.error('[AlertSettings] No active session!');
         setError('Session expired - please sign in again');
         return false;
       }
 
-      console.log('[AlertSettings] Updating settings:', updates);
+      log.debug('[AlertSettings] Updating settings:', updates);
 
       // Use upsert to handle both insert and update cases
       const { data, error: upsertError } = await supabase
@@ -159,16 +160,16 @@ export function useAlertSettings(userId: string | undefined) {
         .single();
 
       if (upsertError) {
-        console.error('[AlertSettings] Upsert error:', upsertError.message, upsertError.code, upsertError.details);
+        log.error('[AlertSettings] Upsert error:', upsertError.message, upsertError.code, upsertError.details);
         setError(`Failed to save: ${upsertError.message}`);
         return false;
       }
 
       setSettings(data);
-      console.log('[AlertSettings] Settings updated successfully:', data);
+      log.debug('[AlertSettings] Settings updated successfully:', data);
       return true;
     } catch (err) {
-      console.error('[AlertSettings] Error:', err);
+      log.error('[AlertSettings] Error:', err);
       setError('An unexpected error occurred');
       return false;
     } finally {
@@ -240,7 +241,7 @@ export async function getWhatsAppRecipients(minConfidence: number = 0): Promise<
     .gte('min_confidence', minConfidence);
 
   if (error) {
-    console.error('[AlertSettings] Failed to get WhatsApp recipients:', error);
+    log.error('[AlertSettings] Failed to get WhatsApp recipients:', error);
     return [];
   }
 
