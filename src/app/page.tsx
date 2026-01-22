@@ -108,11 +108,13 @@ export default function Dashboard() {
   }, []);
 
   // Update time (client-side only to avoid hydration mismatch)
+  /* eslint-disable react-hooks/set-state-in-effect -- Initial client-side hydration sync */
   useEffect(() => {
     setCurrentTime(new Date());
     const interval = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(interval);
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Calculate last violence detection
   const lastViolence = incidents.find(i => i.status === 'detected' || i.status === 'acknowledged');

@@ -3,6 +3,8 @@
  * Addresses GAP-ERR-001 to GAP-ERR-026 from deep dive analysis
  */
 
+import { supabaseLogger as log } from '@/lib/logger';
+
 // Common Supabase error codes
 export const SUPABASE_ERROR_CODES = {
   // Auth errors
@@ -217,7 +219,7 @@ export function logSupabaseError(
 ): void {
   const parsed = parseSupabaseError(error);
 
-  console.error(`[Supabase Error] ${context}:`, {
+  log.error(`[Error] ${context}:`, {
     code: parsed.code,
     message: parsed.message,
     details: parsed.details,
@@ -298,7 +300,7 @@ export async function withRetry<T>(
 
       if (attempt < maxAttempts) {
         const delay = baseDelayMs * Math.pow(2, attempt - 1);
-        console.warn(`[${context}] Attempt ${attempt} failed, retrying in ${delay}ms...`);
+        log.warn(`[${context}] Attempt ${attempt} failed, retrying in ${delay}ms...`);
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }

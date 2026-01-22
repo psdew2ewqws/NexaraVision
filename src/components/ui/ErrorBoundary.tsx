@@ -2,6 +2,7 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { uiLogger as log } from '@/lib/logger';
 
 interface Props {
   children: ReactNode;
@@ -29,9 +30,9 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    // Log error to console in development
-    console.error('[ErrorBoundary] Caught error:', error);
-    console.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
+    // Log error in development
+    log.error('[ErrorBoundary] Caught error:', error);
+    log.error('[ErrorBoundary] Component stack:', errorInfo.componentStack);
 
     // Call optional error handler
     this.props.onError?.(error, errorInfo);
@@ -103,8 +104,8 @@ export class PageErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('[PageErrorBoundary] Caught error:', error);
-    console.error('[PageErrorBoundary] Component stack:', errorInfo.componentStack);
+    log.error('[PageErrorBoundary] Caught error:', error);
+    log.error('[PageErrorBoundary] Component stack:', errorInfo.componentStack);
     this.props.onError?.(error, errorInfo);
   }
 

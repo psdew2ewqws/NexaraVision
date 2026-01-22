@@ -190,6 +190,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Only subscribe if user is authenticated
     if (!user) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- Auth state sync
       setRealtimeStatus('disconnected');
       return;
     }

@@ -144,9 +144,12 @@ export function Sidebar() {
     return () => window.removeEventListener('resize', checkMobile);
   }, []);
 
+  // Close mobile menu on route change - external system sync
+  /* eslint-disable react-hooks/set-state-in-effect -- Route change triggers menu close */
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const userRole = profile?.role || 'guard';
 

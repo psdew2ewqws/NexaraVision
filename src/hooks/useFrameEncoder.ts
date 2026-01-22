@@ -28,7 +28,8 @@ export function useFrameEncoder() {
   const [isReady, setIsReady] = useState(false);
   const [isSupported, setIsSupported] = useState(true);
 
-  // Initialize worker
+  // Initialize worker - one-time setup on mount
+  /* eslint-disable react-hooks/set-state-in-effect -- Worker initialization requires sync setState */
   useEffect(() => {
     // Check if OffscreenCanvas is supported
     if (typeof OffscreenCanvas === 'undefined') {
@@ -37,6 +38,9 @@ export function useFrameEncoder() {
       setIsReady(true);
       return;
     }
+
+    // Copy ref to variable for cleanup function
+    const pendingRequests = pendingRef.current;
 
     try {
       const worker = new Worker('/workers/frame-encoder.worker.js');
@@ -74,7 +78,7 @@ export function useFrameEncoder() {
       return () => {
         worker.terminate();
         workerRef.current = null;
-        pendingRef.current.clear();
+        pendingRequests.clear();
       };
     } catch (err) {
       log.error('Failed to create worker:', err);
@@ -82,6 +86,7 @@ export function useFrameEncoder() {
       setIsReady(true);
     }
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   // Send message to worker and wait for response
   const sendMessage = useCallback(<T>(type: string, payload: Record<string, unknown>): Promise<T> => {

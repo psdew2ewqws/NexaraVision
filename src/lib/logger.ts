@@ -61,6 +61,10 @@ export const storageLogger = new Logger({ prefix: 'Storage' });
 export const incidentLogger = new Logger({ prefix: 'Incident' });
 export const cameraLogger = new Logger({ prefix: 'Camera' });
 export const alertLogger = new Logger({ prefix: 'Alert' });
+export const supabaseLogger = new Logger({ prefix: 'Supabase' });
+export const uiLogger = new Logger({ prefix: 'UI' });
+export const apiLogger = new Logger({ prefix: 'API' });
+export const i18nLogger = new Logger({ prefix: 'i18n' });
 
 // Factory function for custom loggers
 export function createLogger(prefix: string, enabled = isDev): Logger {

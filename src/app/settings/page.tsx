@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/lib/utils';
@@ -292,18 +292,15 @@ export default function SettingsPage() {
     testWhatsApp,
   } = useAlertSettings(user?.id);
 
-  const [whatsappPhone, setWhatsappPhone] = useState('');
+  // Use null to indicate "not yet edited by user" - falls back to alertSettings value
+  // This avoids setState in useEffect (cascading render) while still syncing with server
+  const [whatsappPhoneEdited, setWhatsappPhoneEdited] = useState<string | null>(null);
+  const whatsappPhone = whatsappPhoneEdited ?? alertSettings?.whatsapp_number ?? '';
+  const setWhatsappPhone = setWhatsappPhoneEdited;
   const [whatsappPhoneError, setWhatsappPhoneError] = useState<string | null>(null);
   const [whatsappTesting, setWhatsappTesting] = useState(false);
   const [whatsappTestResult, setWhatsappTestResult] = useState<'success' | 'failed' | null>(null);
   const [whatsappError, setWhatsappError] = useState<string | null>(null);
-
-  // Load WhatsApp phone from settings
-  useEffect(() => {
-    if (alertSettings?.whatsapp_number) {
-      setWhatsappPhone(alertSettings.whatsapp_number);
-    }
-  }, [alertSettings?.whatsapp_number]);
 
   // Validate phone number on change
   const handlePhoneChange = (value: string) => {
