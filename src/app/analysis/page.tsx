@@ -1,24 +1,37 @@
 'use client';
 
 import { useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { cn } from '@/lib/utils';
 import { useIncidents, useCameras, useDashboardStats } from '@/hooks/useSupabase';
 import { PageLoader } from '@/components/ui/page-loader';
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from 'recharts';
+
+// Dynamic imports for recharts components to reduce initial bundle size
+// recharts is ~500KB and only needed on this page
+const IncidentTrendsChart = dynamic(
+  () => import('./components/AnalyticsCharts').then(mod => ({ default: mod.IncidentTrendsChart })),
+  { ssr: false, loading: () => <ChartLoadingSkeleton /> }
+);
+
+const CameraIncidentsChart = dynamic(
+  () => import('./components/AnalyticsCharts').then(mod => ({ default: mod.CameraIncidentsChart })),
+  { ssr: false, loading: () => <ChartLoadingSkeleton /> }
+);
+
+const StatusDistributionChart = dynamic(
+  () => import('./components/AnalyticsCharts').then(mod => ({ default: mod.StatusDistributionChart })),
+  { ssr: false, loading: () => <ChartLoadingSkeleton /> }
+);
+
+// Inline loading skeleton for charts
+function ChartLoadingSkeleton() {
+  return (
+    <div className="h-full flex items-center justify-center">
+      <div className="w-8 h-8 border-2 border-slate-600 border-t-slate-300 rounded-full animate-spin" />
+    </div>
+  );
+}
 
 // Icons
 const Icons = {
@@ -131,8 +144,6 @@ const translations = {
     confidence: 'الثقة',
   },
 };
-
-const COLORS = ['#60a5fa', '#22c55e', '#f59e0b', '#ef4444', '#a855f7', '#ec4899'];
 
 export default function AnalysisPage() {
   const { locale, isRTL } = useLanguage();
@@ -295,33 +306,7 @@ export default function AnalysisPage() {
               <p className="text-xs sm:text-sm text-slate-400">{t.trendsDesc}</p>
             </div>
             <div className="h-48 sm:h-64">
-              {trendsData.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={trendsData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis dataKey="date" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <YAxis stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1e293b',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '8px',
-                        color: '#e2e8f0',
-                      }}
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="incidents"
-                      stroke="#60a5fa"
-                      strokeWidth={2}
-                      dot={{ fill: '#60a5fa', r: 4 }}
-                      activeDot={{ r: 6, fill: '#3b82f6' }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-slate-500">{t.noData}</div>
-              )}
+              <IncidentTrendsChart data={trendsData} noDataText={t.noData} />
             </div>
           </div>
 
@@ -332,26 +317,7 @@ export default function AnalysisPage() {
               <p className="text-xs sm:text-sm text-slate-400">{t.cameraDesc}</p>
             </div>
             <div className="h-48 sm:h-64">
-              {cameraIncidents.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={cameraIncidents} layout="vertical">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                    <XAxis type="number" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 12 }} />
-                    <YAxis dataKey="camera" type="category" stroke="#64748b" tick={{ fill: '#64748b', fontSize: 11 }} width={100} />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1e293b',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '8px',
-                        color: '#e2e8f0',
-                      }}
-                    />
-                    <Bar dataKey="incidents" fill="#60a5fa" radius={[0, 4, 4, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-slate-500">{t.noData}</div>
-              )}
+              <CameraIncidentsChart data={cameraIncidents} noDataText={t.noData} />
             </div>
           </div>
         </div>
@@ -365,36 +331,7 @@ export default function AnalysisPage() {
               <p className="text-xs sm:text-sm text-slate-400">{t.statusDesc}</p>
             </div>
             <div className="h-48 sm:h-64">
-              {statusDistribution.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={statusDistribution}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name} ${((percent || 0) * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {statusDistribution.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1e293b',
-                        border: '1px solid rgba(255,255,255,0.1)',
-                        borderRadius: '8px',
-                        color: '#e2e8f0',
-                      }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-slate-500">{t.noData}</div>
-              )}
+              <StatusDistributionChart data={statusDistribution} noDataText={t.noData} />
             </div>
           </div>
 

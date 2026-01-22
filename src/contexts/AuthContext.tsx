@@ -62,6 +62,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [user?.id, fetchProfile]);
 
+  // Sign out - defined early so it can be used in realtime subscription
+  const signOut = useCallback(async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setProfile(null);
+    setSession(null);
+  }, [supabase]);
+
   // Setup realtime subscription for profile changes
   useEffect(() => {
     if (!user?.id) return;
@@ -170,13 +178,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return { error };
   };
-
-  const signOut = useCallback(async () => {
-    await supabase.auth.signOut();
-    setUser(null);
-    setProfile(null);
-    setSession(null);
-  }, [supabase]);
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error('No user logged in') };
