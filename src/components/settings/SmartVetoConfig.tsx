@@ -114,6 +114,7 @@ export function SmartVetoConfig({ locale, isRTL = false }: SmartVetoConfigProps)
   const t = translations[locale];
   const [expandedModel, setExpandedModel] = useState<'primary' | 'veto' | null>(null);
   const [showThresholdGuide, setShowThresholdGuide] = useState<string | null>(null);
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   const {
     config,
@@ -168,16 +169,209 @@ export function SmartVetoConfig({ locale, isRTL = false }: SmartVetoConfigProps)
 
   return (
     <div className={cn('space-y-6', isRTL && 'rtl')}>
-      {/* Header */}
-      <div className="flex items-start gap-3">
-        <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
-          {Icons.cpu}
+      {/* Header with Help Button */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-start gap-3">
+          <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
+            {Icons.cpu}
+          </div>
+          <div>
+            <h3 className="text-lg font-semibold text-white">{t.title}</h3>
+            <p className="text-sm text-zinc-500">{t.subtitle}</p>
+          </div>
         </div>
-        <div>
-          <h3 className="text-lg font-semibold text-white">{t.title}</h3>
-          <p className="text-sm text-zinc-500">{t.subtitle}</p>
-        </div>
+        <button
+          onClick={() => setShowHelpModal(true)}
+          className="p-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white transition-colors"
+          title={locale === 'ar' ? 'كيف يعمل نظام الفيتو الذكي؟' : 'How does Smart Veto work?'}
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9 5.25h.008v.008H12v-.008z" />
+          </svg>
+        </button>
       </div>
+
+      {/* Help Modal */}
+      <AnimatePresence>
+        {showHelpModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+            onClick={() => setShowHelpModal(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-zinc-900 border border-zinc-700 rounded-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="sticky top-0 bg-zinc-900 border-b border-zinc-800 px-6 py-4 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-purple-500/20 text-purple-400">
+                    {Icons.sparkles}
+                  </div>
+                  <h2 className="text-xl font-bold text-white">
+                    {locale === 'ar' ? 'كيف يعمل نظام الفيتو الذكي؟' : 'How Smart Veto Works'}
+                  </h2>
+                </div>
+                <button
+                  onClick={() => setShowHelpModal(false)}
+                  className="p-2 rounded-lg hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors"
+                >
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="px-6 py-5 space-y-6">
+                {/* Overview */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-2">
+                    {locale === 'ar' ? 'نظرة عامة' : 'Overview'}
+                  </h3>
+                  <p className="text-zinc-400 text-sm leading-relaxed">
+                    {locale === 'ar'
+                      ? 'نظام الفيتو الذكي هو نهج مبتكر للكشف عن العنف يستخدم نموذجين للذكاء الاصطناعي يعملان معًا للتحقق من النتائج. هذا يقلل بشكل كبير من الإنذارات الكاذبة مع الحفاظ على دقة عالية في الكشف.'
+                      : 'Smart Veto is an innovative approach to violence detection that uses two AI models working together to verify results. This significantly reduces false alarms while maintaining high detection accuracy.'}
+                  </p>
+                </div>
+
+                {/* How it works - Visual */}
+                <div className="bg-zinc-800/50 rounded-xl p-4 border border-zinc-700">
+                  <h4 className="text-sm font-semibold text-white mb-4">
+                    {locale === 'ar' ? 'آلية العمل' : 'Detection Flow'}
+                  </h4>
+                  <div className="flex flex-col sm:flex-row items-center gap-4 text-center">
+                    <div className="flex-1 p-3 bg-blue-500/10 rounded-lg border border-blue-500/30">
+                      <div className="text-blue-400 font-bold text-sm mb-1">PRIMARY</div>
+                      <div className="text-xs text-zinc-400">
+                        {locale === 'ar' ? 'الكشف الأولي' : 'Initial Detection'}
+                      </div>
+                    </div>
+                    <div className="text-zinc-600">→</div>
+                    <div className="flex-1 p-3 bg-orange-500/10 rounded-lg border border-orange-500/30">
+                      <div className="text-orange-400 font-bold text-sm mb-1">VETO</div>
+                      <div className="text-xs text-zinc-400">
+                        {locale === 'ar' ? 'التأكيد الثاني' : 'Confirmation'}
+                      </div>
+                    </div>
+                    <div className="text-zinc-600">→</div>
+                    <div className="flex-1 p-3 bg-green-500/10 rounded-lg border border-green-500/30">
+                      <div className="text-green-400 font-bold text-sm mb-1">
+                        {locale === 'ar' ? 'النتيجة' : 'RESULT'}
+                      </div>
+                      <div className="text-xs text-zinc-400">
+                        {locale === 'ar' ? 'موافقة مزدوجة' : 'Dual Agreement'}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* The Logic */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-2">
+                    {locale === 'ar' ? 'المنطق' : 'The Logic'}
+                  </h3>
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+                    <code className="text-amber-400 text-sm font-mono">
+                      {locale === 'ar'
+                        ? 'العنف = (الأساسي ≥ الحد%) و (الفيتو ≥ الحد%)'
+                        : 'VIOLENCE = (PRIMARY ≥ threshold%) AND (VETO ≥ threshold%)'}
+                    </code>
+                    <p className="text-zinc-400 text-xs mt-2">
+                      {locale === 'ar'
+                        ? 'يجب أن يتفق كلا النموذجين على وجود عنف لتفعيل التنبيه'
+                        : 'Both models must agree that violence is present to trigger an alert'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Benefits */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-3">
+                    {locale === 'ar' ? 'المزايا' : 'Benefits'}
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {[
+                      {
+                        icon: '🎯',
+                        title: locale === 'ar' ? 'تقليل الإنذارات الكاذبة' : 'Reduced False Alarms',
+                        desc: locale === 'ar' ? 'النموذج الثاني يرفض الإيجابيات الكاذبة' : 'Second model vetoes false positives',
+                      },
+                      {
+                        icon: '🔒',
+                        title: locale === 'ar' ? 'موثوقية أعلى' : 'Higher Reliability',
+                        desc: locale === 'ar' ? 'التحقق المزدوج يضمن دقة أفضل' : 'Dual verification ensures better accuracy',
+                      },
+                      {
+                        icon: '⚡',
+                        title: locale === 'ar' ? 'نماذج مختلفة' : 'Different Architectures',
+                        desc: locale === 'ar' ? 'نموذجان مختلفان يكملان بعضهما' : 'Two different models complement each other',
+                      },
+                      {
+                        icon: '🎛️',
+                        title: locale === 'ar' ? 'قابل للتخصيص' : 'Customizable',
+                        desc: locale === 'ar' ? 'حدود قابلة للتعديل حسب الاحتياج' : 'Adjustable thresholds per use case',
+                      },
+                    ].map((benefit, i) => (
+                      <div key={i} className="flex items-start gap-3 p-3 bg-zinc-800/50 rounded-lg">
+                        <span className="text-lg">{benefit.icon}</span>
+                        <div>
+                          <p className="text-sm font-medium text-white">{benefit.title}</p>
+                          <p className="text-xs text-zinc-500">{benefit.desc}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Threshold Guide */}
+                <div>
+                  <h3 className="text-lg font-semibold text-white mb-3">
+                    {locale === 'ar' ? 'دليل الحدود' : 'Threshold Guide'}
+                  </h3>
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3 p-3 bg-green-500/10 rounded-lg border border-green-500/20">
+                      <span className="text-green-400 font-bold text-sm w-16">90-99%</span>
+                      <span className="text-zinc-300 text-sm">
+                        {locale === 'ar' ? 'حد صارم - تنبيهات أقل، موثوقية عالية' : 'Strict - Fewer alerts, high confidence'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                      <span className="text-blue-400 font-bold text-sm w-16">70-89%</span>
+                      <span className="text-zinc-300 text-sm">
+                        {locale === 'ar' ? 'متوازن - توازن بين الحساسية والدقة' : 'Balanced - Good sensitivity and accuracy'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                      <span className="text-amber-400 font-bold text-sm w-16">50-69%</span>
+                      <span className="text-zinc-300 text-sm">
+                        {locale === 'ar' ? 'حساس - المزيد من التنبيهات، قد تشمل إيجابيات كاذبة' : 'Sensitive - More alerts, may include false positives'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Footer */}
+              <div className="sticky bottom-0 bg-zinc-900 border-t border-zinc-800 px-6 py-4">
+                <button
+                  onClick={() => setShowHelpModal(false)}
+                  className="w-full py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-lg font-medium transition-colors"
+                >
+                  {locale === 'ar' ? 'فهمت!' : 'Got it!'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Validation Errors */}
       {!isValidCombination && validationErrors.length > 0 && (
