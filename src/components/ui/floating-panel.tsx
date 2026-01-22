@@ -82,7 +82,7 @@ export function FloatingPanelTrigger({
       ref={triggerRef}
       layoutId={`floating-panel-trigger-${uniqueId}`}
       className={cn(
-        "flex h-9 items-center border border-zinc-200 bg-white px-3 text-zinc-900 dark:border-zinc-800 dark:bg-zinc-950 dark:text-white",
+        "flex h-9 items-center border border-zinc-700 bg-zinc-800 px-3 text-zinc-300 hover:bg-zinc-700 hover:text-white transition-colors",
         className
       )}
       style={{ borderRadius: 8 }}
@@ -130,7 +130,7 @@ export function FloatingPanelContent({
             ref={contentRef}
             layoutId={`floating-panel-trigger-${uniqueId}`}
             className={cn(
-              "fixed left-1/2 top-1/2 z-50 overflow-hidden border border-zinc-200 bg-white text-zinc-900 shadow-xl outline-none dark:border-zinc-800 dark:bg-zinc-950 dark:text-white",
+              "fixed left-1/2 top-1/2 z-50 overflow-hidden border border-zinc-700 bg-zinc-900 text-white shadow-xl outline-none",
               className
             )}
             style={{
@@ -189,15 +189,15 @@ export function FloatingPanelHeader({
   return (
     <div
       className={cn(
-        "flex items-center justify-between border-b border-zinc-200 px-4 py-3 dark:border-zinc-800",
+        "flex items-center justify-between border-b border-zinc-700 px-4 py-3",
         className
       )}
     >
-      <span className="font-semibold">{children}</span>
+      <span className="font-semibold text-white">{children}</span>
       <button
         type="button"
         onClick={closePanel}
-        className="rounded-full p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-900 dark:hover:bg-zinc-800 dark:hover:text-white"
+        className="rounded-full p-1 text-zinc-400 hover:bg-zinc-800 hover:text-white transition-colors"
       >
         <X className="h-4 w-4" />
       </button>
@@ -229,7 +229,7 @@ export function FloatingPanelFooter({
   return (
     <div
       className={cn(
-        "flex justify-end gap-2 border-t border-zinc-200 px-4 py-3 dark:border-zinc-800",
+        "flex justify-end gap-2 border-t border-zinc-700 px-4 py-3",
         className
       )}
     >
@@ -253,7 +253,7 @@ export function FloatingPanelCloseButton({
     <button
       type="button"
       className={cn(
-        "flex items-center justify-center rounded-md bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-zinc-200 dark:bg-zinc-800 dark:text-white dark:hover:bg-zinc-700",
+        "flex items-center justify-center rounded-md bg-zinc-800 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 transition-colors",
         className
       )}
       onClick={closePanel}
