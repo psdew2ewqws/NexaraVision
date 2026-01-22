@@ -19,3 +19,4 @@ npm-debug.log*
 # Videos
 public/videos/
 .env*.local
+.claude/ralph-loop.local.md
