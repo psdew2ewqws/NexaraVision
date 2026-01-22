@@ -821,10 +821,21 @@ export default function LivePage() {
       return; // Don't trigger any alerts
     }
 
-    // Fight detection using configurable thresholds
-    // Only run if shouldTriggerAlerts (confirmed VIOLENCE or browser mode)
-    if (!shouldTriggerAlerts) {
+    // SERVER CONFIRMED VIOLENCE - trigger alert IMMEDIATELY (no frame counting needed)
+    // The server's Smart Veto already confirmed this is real violence
+    if (isConfirmedViolence) {
+      violenceHitsRef.current++;
+      // Trigger after just 2 confirmed VIOLENCE frames (very fast response)
+      if (violenceHitsRef.current >= 2) {
+        triggerFightAlert(violence);
+        violenceHitsRef.current = 0; // Reset after triggering
+      }
       return;
+    }
+
+    // BROWSER MODE ONLY (no server result) - use threshold-based detection
+    if (data.result !== undefined) {
+      return; // Server sent SAFE, don't trigger
     }
 
     // Instant trigger: N× frames at X%+
