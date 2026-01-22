@@ -523,7 +523,7 @@ export default function UsersPage() {
                     setShowEditModal(false);
                     resetForm();
                   }}
-                  className="p-1.5 rounded-lg hover:bg-white/[0.06] text-slate-400 hover:text-white transition-colors"
+                  className="p-2.5 min-h-[44px] min-w-[44px] rounded-lg hover:bg-white/[0.06] active:bg-white/[0.1] text-slate-400 hover:text-white transition-colors flex items-center justify-center active:scale-95"
                 >
                   {Icons.x}
                 </button>
@@ -538,7 +538,7 @@ export default function UsersPage() {
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                      className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/[0.06] rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50"
+                      className="w-full px-3 py-2.5 min-h-[44px] bg-slate-800/50 border border-white/[0.06] rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50"
                       placeholder="user@example.com"
                       dir="ltr"
                     />
@@ -552,7 +552,7 @@ export default function UsersPage() {
                       type="text"
                       value={formData.full_name}
                       onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                      className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/[0.06] rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50"
+                      className="w-full px-3 py-2.5 min-h-[44px] bg-slate-800/50 border border-white/[0.06] rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50"
                       placeholder="John Doe"
                     />
                   </div>
@@ -562,7 +562,7 @@ export default function UsersPage() {
                       type="text"
                       value={formData.full_name_ar}
                       onChange={(e) => setFormData({ ...formData, full_name_ar: e.target.value })}
-                      className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/[0.06] rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50"
+                      className="w-full px-3 py-2.5 min-h-[44px] bg-slate-800/50 border border-white/[0.06] rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50"
                       placeholder="الاسم الكامل"
                       dir="rtl"
                     />
@@ -575,7 +575,7 @@ export default function UsersPage() {
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3 py-2.5 bg-slate-800/50 border border-white/[0.06] rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50"
+                    className="w-full px-3 py-2.5 min-h-[44px] bg-slate-800/50 border border-white/[0.06] rounded-lg text-white placeholder:text-slate-500 focus:outline-none focus:border-blue-500/50"
                     placeholder="+966 50 000 0000"
                     dir="ltr"
                   />
@@ -617,14 +617,14 @@ export default function UsersPage() {
                     setShowEditModal(false);
                     resetForm();
                   }}
-                  className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition-colors"
+                  className="flex-1 px-4 py-3 min-h-[48px] bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-300 rounded-lg font-medium transition-colors active:scale-95"
                 >
                   {t.modal.cancel}
                 </button>
                 <button
                   onClick={showAddModal ? handleAddUser : handleEditUser}
                   disabled={saving || !formData.full_name || (showAddModal && !formData.email)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-blue-600 hover:bg-blue-500 active:bg-blue-700 disabled:bg-blue-600/50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors active:scale-95"
                 >
                   {saving ? (
                     <>
@@ -685,14 +685,14 @@ export default function UsersPage() {
                     setShowDeleteModal(false);
                     setSelectedUser(null);
                   }}
-                  className="flex-1 px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition-colors"
+                  className="flex-1 px-4 py-3 min-h-[48px] bg-slate-800 hover:bg-slate-700 active:bg-slate-600 text-slate-300 rounded-lg font-medium transition-colors active:scale-95"
                 >
                   {t.modal.cancel}
                 </button>
                 <button
                   onClick={handleDeleteUser}
                   disabled={saving}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-500 disabled:bg-red-600/50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-red-600 hover:bg-red-500 active:bg-red-700 disabled:bg-red-600/50 disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors active:scale-95"
                 >
                   {saving ? (
                     <>

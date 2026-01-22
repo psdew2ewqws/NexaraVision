@@ -518,7 +518,7 @@ export default function RecordingsPage() {
                       <button
                         onClick={handleDelete}
                         disabled={deleting}
-                        className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-red-800 text-white rounded-lg transition-colors active:scale-95"
+                        className="inline-flex items-center gap-2 px-4 py-3 min-h-[44px] bg-red-600 hover:bg-red-700 active:bg-red-800 disabled:bg-red-800 text-white rounded-lg transition-colors active:scale-95"
                       >
                         {deleting ? (
                           <>
@@ -535,7 +535,7 @@ export default function RecordingsPage() {
                       <button
                         onClick={() => setShowDeleteConfirm(false)}
                         disabled={deleting}
-                        className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors active:scale-95"
+                        className="px-4 py-3 min-h-[44px] bg-slate-700 hover:bg-slate-600 active:bg-slate-500 text-white rounded-lg transition-colors active:scale-95"
                       >
                         {t.cancel}
                       </button>
