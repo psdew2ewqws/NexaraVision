@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
@@ -179,6 +179,18 @@ export default function AlertsPage() {
   const [showModal, setShowModal] = useState(false);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
   const [filter, setFilter] = useState('all');
+
+  // Close modal on Escape key
+  const handleEscapeKey = useCallback((e: KeyboardEvent) => {
+    if (e.key === 'Escape' && showModal) {
+      setShowModal(false);
+    }
+  }, [showModal]);
+
+  useEffect(() => {
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => document.removeEventListener('keydown', handleEscapeKey);
+  }, [handleEscapeKey]);
 
   // Stats
   const stats = {
@@ -411,12 +423,15 @@ export default function AlertsPage() {
             onClick={() => setShowModal(false)}
           >
             <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="incident-modal-title"
               className="bg-slate-900 border border-white/[0.08] rounded-t-xl sm:rounded-xl w-full max-w-2xl max-h-[95vh] sm:max-h-[90vh] overflow-y-auto shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
               <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/[0.06] sticky top-0 bg-slate-900 z-10">
-                <h2 className="text-base sm:text-lg font-medium text-white">{t.modal.title}</h2>
+                <h2 id="incident-modal-title" className="text-base sm:text-lg font-medium text-white">{t.modal.title}</h2>
                 <button
                   onClick={() => setShowModal(false)}
                   aria-label={t.close}

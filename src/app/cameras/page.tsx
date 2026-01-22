@@ -139,6 +139,17 @@ export default function RecordingsPage() {
     setIncidentMedia(null);
   }, []);
 
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedRecording) {
+        closeRecording();
+      }
+    };
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => document.removeEventListener('keydown', handleEscapeKey);
+  }, [selectedRecording, closeRecording]);
+
   // Handle incident deletion
   const handleDelete = async () => {
     if (!selectedRecording) return;
@@ -372,13 +383,16 @@ export default function RecordingsPage() {
           onClick={closeRecording}
         >
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="recording-modal-title"
             className="bg-slate-900 border border-slate-700 rounded-t-xl sm:rounded-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
             <div className="flex items-center justify-between p-3 sm:p-4 border-b border-slate-800 sticky top-0 bg-slate-900 z-10">
               <div>
-                <h3 className="text-white font-medium">
+                <h3 id="recording-modal-title" className="text-white font-medium">
                   {selectedRecording.cameras?.name || 'Recording'}
                 </h3>
                 <p className="text-sm text-slate-500">

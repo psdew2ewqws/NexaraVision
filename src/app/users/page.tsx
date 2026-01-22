@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, ReactNode } from 'react';
+import { useState, useEffect, useCallback, ReactNode } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useProfiles } from '@/hooks/useProfiles';
@@ -256,6 +256,24 @@ export default function UsersPage() {
       console.error('[UsersPage] Fetch error:', fetchError);
     }
   }, [fetchError]);
+
+  // Close modals on Escape key
+  const closeAllModals = useCallback(() => {
+    setShowAddModal(false);
+    setShowEditModal(false);
+    setShowDeleteModal(false);
+    setSelectedUser(null);
+  }, []);
+
+  useEffect(() => {
+    const handleEscapeKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && (showAddModal || showEditModal || showDeleteModal)) {
+        closeAllModals();
+      }
+    };
+    document.addEventListener('keydown', handleEscapeKey);
+    return () => document.removeEventListener('keydown', handleEscapeKey);
+  }, [showAddModal, showEditModal, showDeleteModal, closeAllModals]);
 
   const handleAddUser = async () => {
     setSaving(true);
@@ -520,12 +538,15 @@ export default function UsersPage() {
             }}
           >
             <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="user-modal-title"
               className="bg-slate-900 border border-white/[0.08] rounded-xl w-full max-w-md shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
               <div className="flex items-center justify-between p-5 border-b border-white/[0.06]">
-                <div className="flex items-center gap-2 text-white font-medium">
+                <div id="user-modal-title" className="flex items-center gap-2 text-white font-medium">
                   <span className="text-blue-400">{Icons.userPlus}</span>
                   {showAddModal ? t.modal.addTitle : t.modal.editTitle}
                 </div>
@@ -666,12 +687,15 @@ export default function UsersPage() {
             }}
           >
             <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="delete-modal-title"
               className="bg-slate-900 border border-white/[0.08] rounded-xl w-full max-w-sm shadow-2xl"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
               <div className="p-5 border-b border-white/[0.06]">
-                <div className="flex items-center gap-2 text-red-400 font-medium">
+                <div id="delete-modal-title" className="flex items-center gap-2 text-red-400 font-medium">
                   {Icons.trash}
                   {t.delete.title}
                 </div>
