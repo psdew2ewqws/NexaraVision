@@ -43,7 +43,6 @@ export default function LiveCameraPage() {
       wsRef.current = ws;
 
       ws.onopen = () => {
-        console.log('WebSocket connected');
         setIsDetecting(true);
         startFrameCapture();
       };
@@ -60,24 +59,22 @@ export default function LiveCameraPage() {
               handleViolenceDetected(probability);
             }
           }
-        } catch (err) {
-          console.error('Failed to parse WebSocket message:', err);
+        } catch {
+          // Silently ignore parse errors
         }
       };
 
-      ws.onerror = (err) => {
-        console.error('WebSocket error:', err);
+      ws.onerror = () => {
         setError('WebSocket connection failed');
         stopDetection();
       };
 
       ws.onclose = () => {
-        console.log('WebSocket disconnected');
+        // Connection closed
       };
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Camera access denied';
       setError(errorMessage);
-      console.error('Failed to start detection:', err);
     }
   };
 

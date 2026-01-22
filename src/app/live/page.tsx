@@ -54,7 +54,7 @@ import {
 import { useDetectionSettings } from '@/hooks/useDetectionSettings';
 import { useAlertSettings } from '@/hooks/useAlertSettings';
 import { useAuth } from '@/contexts/AuthContext';
-import { createLogger, wsLogger, incidentLogger, alertLogger, cameraLogger } from '@/lib/logger';
+import { createLogger, wsLogger, incidentLogger, alertLogger } from '@/lib/logger';
 
 // Module-specific loggers
 const webrtcLog = createLogger('WebRTC');
@@ -360,7 +360,7 @@ export default function LivePage() {
   const currentIncidentIdRef = useRef<string | null>(null);
   const lastIncidentTimeRef = useRef<number>(0);
   const lastFrameSentTimeRef = useRef<number>(0);  // For frame rate throttling
-  const lastWsWarningRef = useRef<number>(0);  // Throttle WS warning logs
+  const _lastWsWarningRef = useRef<number>(0);  // Reserved for future WS warning throttling
   const TARGET_FPS = 10;  // 10 FPS = 100ms interval (reduced for smoother UI)
   const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
 
@@ -392,17 +392,23 @@ export default function LivePage() {
     await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js');
     await loadScript('https://cdn.jsdelivr.net/npm/@tensorflow-models/pose-detection@2.1.0/dist/pose-detection.min.js');
 
-    await (window as any).tf.setBackend('webgl');
-    await (window as any).tf.ready();
+    // TensorFlow.js and pose-detection are loaded via CDN, use window with type assertion
+     
+    const tf = (window as unknown as { tf: { setBackend: (backend: string) => Promise<void>; ready: () => Promise<void> } }).tf;
+     
+    const poseDetection = (window as unknown as { poseDetection: { SupportedModels: { MoveNet: unknown }; movenet: { modelType: { MULTIPOSE_LIGHTNING: unknown } }; createDetector: (model: unknown, config: unknown) => Promise<unknown> } }).poseDetection;
 
-    const model = (window as any).poseDetection.SupportedModels.MoveNet;
+    await tf.setBackend('webgl');
+    await tf.ready();
+
+    const model = poseDetection.SupportedModels.MoveNet;
     const detectorConfig = {
-      modelType: (window as any).poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING,
+      modelType: poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING,
       enableSmoothing: true,
       minPoseScore: 0.25,
     };
 
-    poseDetectorRef.current = await (window as any).poseDetection.createDetector(model, detectorConfig);
+    poseDetectorRef.current = await poseDetection.createDetector(model, detectorConfig);
   };
 
   // Start webcam
@@ -773,16 +779,30 @@ export default function LivePage() {
               // Process detection result
               processDetectionResult(data);
 
-              // Draw YOLO v26 skeletons from v39 response
-              const skeletons = data.all_skeletons || data.skeletons || [];
-              if (skeletons.length > 0) {
-                drawServerSkeletons(skeletons);
-              } else {
-                // Clear overlay if no skeletons
+              // Handle skeleton display - same logic as smart_veto_final handler
+              // FIX: Check for processed_frame first to avoid dual skeleton rendering
+              if (data.processed_frame) {
+                // Server sent processed frame with skeleton - display it
+                displayProcessedFrame(data.processed_frame);
+                // Clear overlay canvas since skeleton is in processed frame
                 const overlay = overlayCanvasRef.current;
                 if (overlay) {
                   const ctx = overlay.getContext('2d');
                   if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+                }
+              } else {
+                // Fallback: draw skeletons client-side (only if no processed_frame)
+                clearProcessedFrame();
+                const skeletons = data.all_skeletons || data.skeletons || [];
+                if (skeletons.length > 0) {
+                  drawServerSkeletons(skeletons);
+                } else {
+                  // Clear overlay if no skeletons
+                  const overlay = overlayCanvasRef.current;
+                  if (overlay) {
+                    const ctx = overlay.getContext('2d');
+                    if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
+                  }
                 }
               }
               return;
@@ -832,7 +852,8 @@ export default function LivePage() {
     const isVetoed = data.result === 'VETOED';
     const isConfirmedViolence = data.result === 'VIOLENCE';
     // For browser mode (no result field), use threshold-based detection
-    const shouldTriggerAlerts = isConfirmedViolence || (data.result === undefined);
+    // Note: shouldTriggerAlerts reserved for future alert customization
+    const _shouldTriggerAlerts = isConfirmedViolence || (data.result === undefined);
 
     // Use configurable threshold for violent frame counting
     // DON'T count VETOED frames as violent
@@ -899,6 +920,7 @@ export default function LivePage() {
     setStats((prev) => ({ ...prev, fightCount: prev.fightCount + 1 }));
 
     // Throttle incident creation - minimum 10 seconds between incidents
+     
     const now = Date.now();
     const timeSinceLastIncident = now - lastIncidentTimeRef.current;
     const shouldCreateNewIncident = timeSinceLastIncident > 10000; // 10 seconds
@@ -1050,8 +1072,10 @@ export default function LivePage() {
     // Play alert sound
     if (!isMuted && detectionSettings.sound_enabled) {
       try {
-        // Use Web Audio API for more reliable playback
-        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        // Use Web Audio API for more reliable playback (webkitAudioContext for Safari)
+         
+        const AudioContextClass = window.AudioContext || (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        const audioContext = new AudioContextClass!();
         const oscillator = audioContext.createOscillator();
         const gainNode = audioContext.createGain();
 
@@ -1073,9 +1097,11 @@ export default function LivePage() {
   };
 
   // Detection loop with frame rate throttling (GAP-007 fix)
+   
   const runDetectionLoop = useCallback(async () => {
     if (!isActive || !videoRef.current || !canvasRef.current) {
       if (isActive) {
+         
         animationRef.current = requestAnimationFrame(runDetectionLoop);
       }
       return;
@@ -1085,6 +1111,7 @@ export default function LivePage() {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     if (!ctx) {
+       
       animationRef.current = requestAnimationFrame(runDetectionLoop);
       return;
     }
@@ -1132,7 +1159,9 @@ export default function LivePage() {
     if (detectionMode === 'browser' && poseDetectorRef.current) {
       try {
         const poses = await poseDetectorRef.current.estimatePoses(video);
+         
         drawPoses(poses);
+         
         analyzePostures(poses);
       } catch (err) {
         detectionLog.error('Pose detection error:', err);
@@ -1297,6 +1326,7 @@ export default function LivePage() {
   // Draw YOLO v26 skeletons from server response (COCO 17-keypoint format)
   // CRITICAL: Server coordinates are in SENT FRAME SIZE (max 640x480), not video native size!
   // MOBILE FIX: Account for object-contain letterboxing
+  // FIX: De-duplicate overlapping skeletons to prevent double rendering
   const drawServerSkeletons = (skeletons: number[][][]) => {
     const overlay = overlayCanvasRef.current;
     const video = videoRef.current;
@@ -1306,6 +1336,44 @@ export default function LivePage() {
 
     const ctx = overlay.getContext('2d');
     if (!ctx) return;
+
+    // De-duplicate skeletons that are too close (same person detected twice)
+    // Compare center of mass of each skeleton, filter out duplicates
+    const dedupedSkeletons = skeletons.filter((skeleton, index) => {
+      // Calculate center of mass for this skeleton using visible keypoints
+      let sumX = 0, sumY = 0, count = 0;
+      skeleton.forEach(kp => {
+        if (kp && kp.length >= 3 && kp[2] > 0.3) { // confidence > 0.3
+          sumX += kp[0];
+          sumY += kp[1];
+          count++;
+        }
+      });
+      if (count === 0) return true; // Keep if no keypoints (shouldn't happen)
+      const centerX = sumX / count;
+      const centerY = sumY / count;
+
+      // Check if any earlier skeleton is too close (within 50px threshold)
+      for (let i = 0; i < index; i++) {
+        let sumX2 = 0, sumY2 = 0, count2 = 0;
+        skeletons[i].forEach(kp => {
+          if (kp && kp.length >= 3 && kp[2] > 0.3) {
+            sumX2 += kp[0];
+            sumY2 += kp[1];
+            count2++;
+          }
+        });
+        if (count2 > 0) {
+          const centerX2 = sumX2 / count2;
+          const centerY2 = sumY2 / count2;
+          const distance = Math.sqrt((centerX - centerX2) ** 2 + (centerY - centerY2) ** 2);
+          if (distance < 50) {
+            return false; // Skip this skeleton, it's a duplicate
+          }
+        }
+      }
+      return true; // Keep this skeleton
+    });
 
     // IMPORTANT: Server coordinates are in the SENT frame size (max 640x480)
     // NOT in video.videoWidth/videoHeight!
@@ -1371,7 +1439,7 @@ export default function LivePage() {
     const scaleX = videoDisplayWidth / sentWidth;
     const scaleY = videoDisplayHeight / sentHeight;
 
-    skeletons.forEach((skeleton, poseIndex) => {
+    dedupedSkeletons.forEach((skeleton, poseIndex) => {
       if (!skeleton || skeleton.length < 17) {
         return;
       }
@@ -1505,6 +1573,7 @@ export default function LivePage() {
 
     // Set timeout to finalize after RECORDING_DURATION (NO reset on re-trigger)
     recordingTimeoutRef.current = setTimeout(() => {
+       
       finalizeIncidentRecording();
     }, RECORDING_DURATION * 1000);
   }, []);

@@ -38,7 +38,6 @@ export function getWhatsAppConfig(): WhatsAppConfig | null {
   const token = process.env.NEXT_PUBLIC_WHATSAPP_TOKEN;
 
   if (!instanceId || !token) {
-    console.warn('[WhatsApp] Missing configuration - instanceId or token not set');
     return null;
   }
 
@@ -88,8 +87,6 @@ export async function sendWhatsAppMessage(
   const url = `${WHATSAPP_API_URL}/sendMessage?${params.toString()}`;
 
   try {
-    console.log('[WhatsApp] Sending message to:', formattedPhone);
-
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -100,14 +97,11 @@ export async function sendWhatsAppMessage(
     const data = await response.json();
 
     if (data.sent) {
-      console.log('[WhatsApp] Message sent successfully:', data.id);
       return data;
     } else {
-      console.error('[WhatsApp] Failed to send message:', data);
       return { sent: false, error: data.message || 'Failed to send message' };
     }
   } catch (error) {
-    console.error('[WhatsApp] Error sending message:', error);
     return {
       sent: false,
       error: error instanceof Error ? error.message : 'Unknown error'
@@ -160,9 +154,6 @@ export async function sendAlertToMultiple(
       result: await sendViolenceAlert(phone, alert, config),
     }))
   );
-
-  const successful = results.filter(r => r.result.sent).length;
-  console.log(`[WhatsApp] Sent alerts: ${successful}/${phones.length} successful`);
 
   return results;
 }

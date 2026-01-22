@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, Re
 import { User, Session, RealtimeChannel } from '@supabase/supabase-js';
 import { getSupabase } from '@/lib/supabase/client';
 import { Profile, UserRole } from '@/types/database';
+import { authLogger as log } from '@/lib/logger';
 
 interface AuthContextType {
   user: User | null;
@@ -88,7 +89,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             filter: `id=eq.${user.id}`,
           },
           (payload) => {
-            console.log('[Auth] Profile realtime update:', payload.eventType);
+            log.debug('Profile realtime update:', payload.eventType);
 
             if (payload.eventType === 'UPDATE') {
               const newProfile = payload.new as Profile;
@@ -97,18 +98,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               // If role changed, log it (use ref to avoid stale closure)
               const currentProfile = profileRef.current;
               if (currentProfile && currentProfile.role !== newProfile.role) {
-                console.log(`[Auth] Role changed: ${currentProfile.role} -> ${newProfile.role}`);
+                log.debug(`Role changed: ${currentProfile.role} -> ${newProfile.role}`);
               }
             } else if (payload.eventType === 'DELETE') {
               // Profile deleted - sign out
-              console.log('[Auth] Profile deleted, signing out');
+              log.debug('Profile deleted, signing out');
               signOut();
             }
           }
         )
-        .subscribe((status) => {
-          console.log('[Auth] Profile subscription status:', status);
-        });
+        .subscribe();
     };
 
     setupRealtimeProfile();
@@ -139,7 +138,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('[Auth] Auth state changed:', event);
+        log.debug('Auth state changed:', event);
         setSession(session);
         setUser(session?.user ?? null);
 

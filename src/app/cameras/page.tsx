@@ -159,7 +159,6 @@ export default function RecordingsPage() {
     setDeleting(false);
 
     if (deleteError) {
-      console.error('[Cameras] Delete failed:', deleteError.message);
       alert('Failed to delete: ' + deleteError.message);
       return;
     }
@@ -180,12 +179,10 @@ export default function RecordingsPage() {
       .then((media) => {
         if (!cancelled) {
           setIncidentMedia(media);
-          console.log('[Cameras] Loaded incident media:', media);
         }
       })
-      .catch((err) => {
+      .catch(() => {
         if (!cancelled) {
-          console.error('[Cameras] Error loading media:', err);
           setIncidentMedia(null);
         }
       })

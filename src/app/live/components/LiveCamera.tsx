@@ -34,7 +34,7 @@ import {
 } from '@/components/ui/texture-card';
 import { TextureButton } from '@/components/ui/texture-button';
 import { useSimpleFrameEncoder } from '@/hooks/useFrameEncoder';
-import { createLogger, wsLogger, alertLogger } from '@/lib/logger';
+import { createLogger, alertLogger } from '@/lib/logger';
 
 const poseLog = createLogger('Pose');
 const vastaiLog = createLogger('Vast.ai');

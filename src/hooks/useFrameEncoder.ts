@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useCallback, useEffect, useState } from 'react';
+import { cameraLogger as log } from '@/lib/logger';
 
 /**
  * Web Worker-based frame encoder hook
@@ -31,7 +32,7 @@ export function useFrameEncoder() {
   useEffect(() => {
     // Check if OffscreenCanvas is supported
     if (typeof OffscreenCanvas === 'undefined') {
-      console.warn('[FrameEncoder] OffscreenCanvas not supported, falling back to main thread');
+      log.warn('OffscreenCanvas not supported, falling back to main thread');
       setIsSupported(false);
       setIsReady(true);
       return;
@@ -45,7 +46,6 @@ export function useFrameEncoder() {
 
         if (type === 'ready') {
           setIsReady(true);
-          console.log('[FrameEncoder] Worker ready');
           return;
         }
 
@@ -64,7 +64,7 @@ export function useFrameEncoder() {
       };
 
       worker.onerror = (error) => {
-        console.error('[FrameEncoder] Worker error:', error);
+        log.error('Worker error:', error);
         setIsSupported(false);
         setIsReady(true);
       };
@@ -77,7 +77,7 @@ export function useFrameEncoder() {
         pendingRef.current.clear();
       };
     } catch (err) {
-      console.error('[FrameEncoder] Failed to create worker:', err);
+      log.error('Failed to create worker:', err);
       setIsSupported(false);
       setIsReady(true);
     }
@@ -108,7 +108,7 @@ export function useFrameEncoder() {
       await sendMessage<{ success: boolean }>('init', { width, height });
       return true;
     } catch (err) {
-      console.error('[FrameEncoder] Init failed:', err);
+      log.error('Init failed:', err);
       return false;
     }
   }, [sendMessage, isSupported]);
@@ -122,7 +122,7 @@ export function useFrameEncoder() {
     try {
       return await sendMessage<string>('encode', { imageBitmap, quality });
     } catch (err) {
-      console.error('[FrameEncoder] Encode failed:', err);
+      log.error('Encode failed:', err);
       return null;
     }
   }, [sendMessage, isSupported]);
@@ -145,7 +145,7 @@ export function useFrameEncoder() {
       const dataUrl = canvas.toDataURL('image/jpeg', quality);
       return dataUrl.split(',')[1]; // Return just the base64 part
     } catch (err) {
-      console.error('[FrameEncoder] Main thread encode failed:', err);
+      log.error('Main thread encode failed:', err);
       return null;
     }
   }, []);
@@ -173,7 +173,7 @@ export function useFrameEncoder() {
       // Send to worker for encoding
       return await encodeFrame(bitmap, quality);
     } catch (err) {
-      console.error('[FrameEncoder] Video encode failed:', err);
+      log.error('Video encode failed:', err);
       // Fallback to main thread
       return encodeOnMainThread(video, width, height, quality);
     }

@@ -4,6 +4,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { DetectionWebSocket, type DetectionResult } from '@/lib/websocket';
+import { wsLogger as log } from '@/lib/logger';
 
 export interface UseWebSocketOptions {
   autoConnect?: boolean;
@@ -54,7 +55,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
     try {
       await wsRef.current.connect();
     } catch (err) {
-      console.error('Failed to connect WebSocket:', err);
+      log.error('Failed to connect WebSocket:', err);
       throw err;
     }
   }, [onDetection, onError]);
@@ -77,7 +78,7 @@ export function useWebSocket(options: UseWebSocketOptions = {}): UseWebSocketRet
   useEffect(() => {
     if (autoConnect) {
       connect().catch((err) => {
-        console.error('Auto-connect failed:', err);
+        log.error('Auto-connect failed:', err);
       });
     }
 

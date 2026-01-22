@@ -250,12 +250,6 @@ export default function UsersPage() {
     deleteProfile: deleteProfileFn,
   } = useProfiles({ searchQuery });
 
-  // Debug: log errors
-  useEffect(() => {
-    if (fetchError) {
-      console.error('[UsersPage] Fetch error:', fetchError);
-    }
-  }, [fetchError]);
 
   // Close modals on Escape key
   const closeAllModals = useCallback(() => {
@@ -287,14 +281,13 @@ export default function UsersPage() {
         role: formData.role,
       });
       if (error) {
-        console.error('[UsersPage] Create error:', error);
         alert('Error creating user: ' + (error.message || 'Unknown error'));
       } else {
         setShowAddModal(false);
         resetForm();
       }
-    } catch (err) {
-      console.error('[UsersPage] Create exception:', err);
+    } catch {
+      // Error handled by alert
     } finally {
       setSaving(false);
     }

@@ -11,7 +11,6 @@ function formatPhoneNumber(phone: string): string {
   }
   // Remove leading zeros (common mistake: +062 instead of +62)
   cleaned = cleaned.replace(/^0+/, '');
-  console.log('[WhatsApp] Phone formatted:', phone, '->', cleaned);
   return cleaned;
 }
 
@@ -28,8 +27,6 @@ export async function POST(request: NextRequest) {
 
     const instanceId = process.env.WHATSAPP_INSTANCE_ID;
     const token = process.env.WHATSAPP_TOKEN;
-
-    console.log('[WhatsApp Test] Config check - instanceId exists:', !!instanceId, 'token exists:', !!token);
 
     if (!instanceId || !token) {
       return NextResponse.json(
@@ -66,10 +63,6 @@ https://nexara-vision.vercel.app/alerts
 
     const url = `${WHATSAPP_API_URL}/sendMessage?${params.toString()}`;
 
-    console.log('[WhatsApp Test] Sending test to:', formattedPhone);
-
-    console.log('[WhatsApp Test] Calling API:', url.replace(token, '***'));
-
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -78,7 +71,6 @@ https://nexara-vision.vercel.app/alerts
     });
 
     const responseText = await response.text();
-    console.log('[WhatsApp Test] Raw response:', responseText);
 
     let data;
     try {
@@ -92,7 +84,6 @@ https://nexara-vision.vercel.app/alerts
 
     // 4whats API returns { sent: true } on success
     if (data.sent === true) {
-      console.log('[WhatsApp Test] Success:', data.id);
       return NextResponse.json({
         success: true,
         message: 'Test message sent successfully',

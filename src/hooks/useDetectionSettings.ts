@@ -100,7 +100,7 @@ export function useDetectionSettings(): UseDetectionSettingsResult {
             // PGRST116 = no rows found, which is OK
             // PGRST204/PGRST205 = table doesn't exist (migration not run yet)
             if (fetchError.code === 'PGRST204' || fetchError.code === 'PGRST205' || fetchError.code === '42P01') {
-              console.info('[Detection Settings] Table not found - using localStorage. Run the migration to enable cloud sync.');
+              log.info('Table not found - using localStorage. Run the migration to enable cloud sync.');
             } else {
               log.warn('[Detection Settings] Error loading from Supabase, using localStorage:', fetchError.message || fetchError.code);
             }
@@ -167,7 +167,7 @@ export function useDetectionSettings(): UseDetectionSettingsResult {
       if (upsertError) {
         // PGRST204/PGRST205/42P01 = table doesn't exist (migration not run yet)
         if (upsertError.code === 'PGRST204' || upsertError.code === 'PGRST205' || upsertError.code === '42P01') {
-          console.info('[Detection Settings] Table not found - saving to localStorage. Run the migration to enable cloud sync.');
+          log.info('Table not found - saving to localStorage. Run the migration to enable cloud sync.');
         } else {
           log.warn('[Detection Settings] Error saving to Supabase:', upsertError.message || upsertError.code);
         }

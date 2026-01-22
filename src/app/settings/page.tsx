@@ -318,20 +318,12 @@ export default function SettingsPage() {
   };
 
   const handleWhatsAppToggle = async (enabled: boolean) => {
-    console.log('[Settings] WhatsApp toggle clicked, enabled:', enabled, 'phone:', whatsappPhone);
-    if (!user) {
-      console.log('[Settings] No user, cannot toggle WhatsApp');
-      return;
-    }
-    if (enabled && !whatsappPhone) {
-      console.log('[Settings] Cannot enable without phone number');
-      return; // Don't enable without a phone number
-    }
-    const result = await updateAlertSettings({
+    if (!user) return;
+    if (enabled && !whatsappPhone) return; // Don't enable without a phone number
+    await updateAlertSettings({
       whatsapp_enabled: enabled,
       whatsapp_number: enabled ? whatsappPhone : alertSettings?.whatsapp_number,
     });
-    console.log('[Settings] WhatsApp toggle result:', result);
   };
 
   const handleWhatsAppSave = async () => {
@@ -375,23 +367,13 @@ export default function SettingsPage() {
   };
 
   const handleMinConfidenceChange = async (value: number) => {
-    console.log('[Settings] Min confidence changed to:', value);
-    if (!user) {
-      console.log('[Settings] No user, cannot update confidence');
-      return;
-    }
-    const result = await updateAlertSettings({ min_confidence: value / 100 });
-    console.log('[Settings] Min confidence update result:', result);
+    if (!user) return;
+    await updateAlertSettings({ min_confidence: value / 100 });
   };
 
   const handleCooldownChange = async (value: number) => {
-    console.log('[Settings] Cooldown changed to:', value);
-    if (!user) {
-      console.log('[Settings] No user, cannot update cooldown');
-      return;
-    }
-    const result = await updateAlertSettings({ alert_cooldown_seconds: value });
-    console.log('[Settings] Cooldown update result:', result);
+    if (!user) return;
+    await updateAlertSettings({ alert_cooldown_seconds: value });
   };
 
   const handleSave = async () => {

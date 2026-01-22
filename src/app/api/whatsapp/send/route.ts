@@ -79,7 +79,6 @@ export async function POST(request: NextRequest) {
 
             if (elapsedSeconds < cooldownSeconds) {
               const remainingSeconds = Math.ceil(cooldownSeconds - elapsedSeconds);
-              console.log(`[WhatsApp API] Cooldown active for user ${alert.userId}. ${remainingSeconds}s remaining`);
               return NextResponse.json({
                 success: false,
                 cooldownActive: true,
@@ -140,8 +139,6 @@ https://nexaravision.com/alerts
 
     const url = `${WHATSAPP_API_URL}/sendMessage?${params.toString()}`;
 
-    console.log('[WhatsApp API] Sending message to:', formattedPhone);
-
     const response = await fetch(url, {
       method: 'GET',
       headers: {
@@ -152,25 +149,16 @@ https://nexaravision.com/alerts
     const data = await response.json();
 
     if (data.sent) {
-      console.log('[WhatsApp API] Message sent successfully:', data.id);
-
       // Update last_alert_sent_at for incident alerts
       if ('incidentId' in body && body.userId) {
-        const { error: updateError } = await supabase
+        await supabase
           .from('alert_settings')
           .update({ last_alert_sent_at: new Date().toISOString() })
           .eq('user_id', body.userId);
-
-        if (updateError) {
-          console.error('[WhatsApp API] Failed to update last_alert_sent_at:', updateError);
-        } else {
-          console.log('[WhatsApp API] Updated last_alert_sent_at for user:', body.userId);
-        }
       }
 
       return NextResponse.json({ success: true, ...data });
     } else {
-      console.error('[WhatsApp API] Failed to send:', data);
       return NextResponse.json(
         { error: data.message || 'Failed to send message', details: data },
         { status: 400 }

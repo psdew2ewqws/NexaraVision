@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { storageLogger as log } from '@/lib/logger';
 
 export interface DetectionEvent {
   id: string;
@@ -61,7 +62,7 @@ export function useDetectionHistory(
         return JSON.parse(stored);
       }
     } catch (err) {
-      console.error('Failed to load detection history:', err);
+      log.error('Failed to load detection history:', err);
     }
     return [];
   });
@@ -72,7 +73,7 @@ export function useDetectionHistory(
       try {
         localStorage.setItem(storageKey, JSON.stringify(events));
       } catch (err) {
-        console.error('Failed to save detection history:', err);
+        log.error('Failed to save detection history:', err);
       }
     }
   }, [events, autoSave, storageKey]);
