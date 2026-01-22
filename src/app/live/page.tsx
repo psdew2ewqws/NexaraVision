@@ -255,6 +255,7 @@ export default function LivePage() {
   const [source, setSource] = useState<SourceType>('webcam');
   const [detectionMode, setDetectionMode] = useState<DetectionMode>('server');
   const [isActive, setIsActive] = useState(false);
+  const isActiveRef = useRef(false);  // Track isActive for closures (avoid stale closure bug)
   const [isMuted, setIsMuted] = useState(true);
   const [currentViolence, setCurrentViolence] = useState(0);
   const [status, setStatus] = useState<'idle' | 'connecting' | 'active' | 'detecting' | 'paused' | 'error'>('idle');
@@ -326,6 +327,7 @@ export default function LivePage() {
   const currentIncidentIdRef = useRef<string | null>(null);
   const lastIncidentTimeRef = useRef<number>(0);
   const lastFrameSentTimeRef = useRef<number>(0);  // For frame rate throttling
+  const lastWsWarningRef = useRef<number>(0);  // Throttle WS warning logs
   const TARGET_FPS = 10;  // 10 FPS = 100ms interval (reduced for smoother UI)
   const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
 
@@ -790,7 +792,8 @@ export default function LivePage() {
 
         ws.onclose = (event) => {
           console.log('[WS] Closed, code:', event.code, 'reason:', event.reason);
-          if (isActive) {
+          // Use ref to avoid stale closure - isActiveRef is always current
+          if (isActiveRef.current) {
             console.log('[WS] Reconnecting in 2s...');
             setTimeout(() => connectWebSocket(), 2000);
           }
@@ -1072,7 +1075,12 @@ export default function LivePage() {
     } else if (detectionMode === 'server') {
       // Check WebSocket status
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-        console.warn('[WS] Waiting for connection, state:', wsRef.current?.readyState);
+        // Throttle warning log to once per second (prevents console spam)
+        const now = Date.now();
+        if (now - lastWsWarningRef.current > 1000) {
+          console.warn('[WS] Waiting for connection, state:', wsRef.current?.readyState);
+          lastWsWarningRef.current = now;
+        }
         animationRef.current = requestAnimationFrame(runDetectionLoop);
         return;
       }
@@ -1648,6 +1656,11 @@ export default function LivePage() {
   useEffect(() => {
     defaultLocationRef.current = defaultLocation;
   }, [defaultLocation]);
+
+  // Sync isActiveRef with isActive state (prevents stale closure in WS onclose)
+  useEffect(() => {
+    isActiveRef.current = isActive;
+  }, [isActive]);
 
   // Cleanup on unmount
   useEffect(() => {
