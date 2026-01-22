@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from 'react';
 import { User, Session, RealtimeChannel } from '@supabase/supabase-js';
 import { getSupabase } from '@/lib/supabase/client';
 import { Profile, UserRole } from '@/types/database';
@@ -31,6 +31,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Ref to access current profile in callbacks without causing re-subscriptions
+  const profileRef = useRef<Profile | null>(null);
+  useEffect(() => {
+    profileRef.current = profile;
+  }, [profile]);
 
   const supabase = getSupabase();
 
@@ -80,9 +86,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               const newProfile = payload.new as Profile;
               setProfile(newProfile);
 
-              // If role changed, log it
-              if (profile && profile.role !== newProfile.role) {
-                console.log(`[Auth] Role changed: ${profile.role} -> ${newProfile.role}`);
+              // If role changed, log it (use ref to avoid stale closure)
+              const currentProfile = profileRef.current;
+              if (currentProfile && currentProfile.role !== newProfile.role) {
+                console.log(`[Auth] Role changed: ${currentProfile.role} -> ${newProfile.role}`);
               }
             } else if (payload.eventType === 'DELETE') {
               // Profile deleted - sign out
@@ -103,7 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         supabase.removeChannel(profileChannel);
       }
     };
-  }, [user?.id, supabase, profile?.role]);
+  }, [user?.id, supabase, signOut]);
 
   // Initial session and auth state listener
   useEffect(() => {
@@ -164,12 +171,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error };
   };
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
     setProfile(null);
     setSession(null);
-  };
+  }, [supabase]);
 
   const updateProfile = async (updates: Partial<Profile>) => {
     if (!user) return { error: new Error('No user logged in') };

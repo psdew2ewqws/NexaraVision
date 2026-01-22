@@ -46,6 +46,31 @@ export function useDetectionSettings(): UseDetectionSettingsResult {
   const [error, setError] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
 
+  // Helper to load settings from localStorage (defined before useEffect to avoid hoisting issues)
+  const loadFromLocalStorage = useCallback((): DetectionSettings | null => {
+    try {
+      const stored = localStorage.getItem(LEGACY_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Convert camelCase localStorage format to our format
+        const loadedSettings: DetectionSettings = {
+          ...DEFAULT_DETECTION_SETTINGS,
+          primary_threshold: parsed.primaryThreshold ?? DEFAULT_DETECTION_SETTINGS.primary_threshold,
+          veto_threshold: parsed.vetoThreshold ?? DEFAULT_DETECTION_SETTINGS.veto_threshold,
+          instant_trigger_threshold: parsed.instantTriggerThreshold ?? DEFAULT_DETECTION_SETTINGS.instant_trigger_threshold,
+          instant_trigger_count: parsed.instantTriggerCount ?? DEFAULT_DETECTION_SETTINGS.instant_trigger_count,
+          sustained_threshold: parsed.sustainedThreshold ?? DEFAULT_DETECTION_SETTINGS.sustained_threshold,
+          sustained_duration: parsed.sustainedDuration ?? DEFAULT_DETECTION_SETTINGS.sustained_duration,
+        };
+        setSettings(loadedSettings);
+        return loadedSettings;
+      }
+    } catch (e) {
+      console.error('Failed to parse localStorage settings:', e);
+    }
+    return null;
+  }, []);
+
   // Load settings on mount
   useEffect(() => {
     async function loadSettings() {
@@ -116,31 +141,7 @@ export function useDetectionSettings(): UseDetectionSettingsResult {
     }
 
     loadSettings();
-  }, []);
-
-  const loadFromLocalStorage = useCallback((): DetectionSettings | null => {
-    try {
-      const stored = localStorage.getItem(LEGACY_STORAGE_KEY);
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        // Convert camelCase localStorage format to our format
-        const loadedSettings: DetectionSettings = {
-          ...DEFAULT_DETECTION_SETTINGS,
-          primary_threshold: parsed.primaryThreshold ?? DEFAULT_DETECTION_SETTINGS.primary_threshold,
-          veto_threshold: parsed.vetoThreshold ?? DEFAULT_DETECTION_SETTINGS.veto_threshold,
-          instant_trigger_threshold: parsed.instantTriggerThreshold ?? DEFAULT_DETECTION_SETTINGS.instant_trigger_threshold,
-          instant_trigger_count: parsed.instantTriggerCount ?? DEFAULT_DETECTION_SETTINGS.instant_trigger_count,
-          sustained_threshold: parsed.sustainedThreshold ?? DEFAULT_DETECTION_SETTINGS.sustained_threshold,
-          sustained_duration: parsed.sustainedDuration ?? DEFAULT_DETECTION_SETTINGS.sustained_duration,
-        };
-        setSettings(loadedSettings);
-        return loadedSettings;
-      }
-    } catch (e) {
-      console.error('Failed to parse localStorage settings:', e);
-    }
-    return null;
-  }, []);
+  }, [loadFromLocalStorage]);
 
   const saveToSupabase = async (uid: string, settingsToSave: DetectionSettings): Promise<boolean> => {
     try {
