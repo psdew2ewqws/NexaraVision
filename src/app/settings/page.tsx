@@ -15,6 +15,7 @@ import {
   ToggleSetting,
   SummaryBox,
 } from '@/components/ui/toolbar-expandable';
+import { SmartVetoConfig } from '@/components/settings/SmartVetoConfig';
 import {
   FloatingPanelRoot,
   FloatingPanelTrigger,
@@ -441,12 +442,21 @@ export default function SettingsPage() {
           )}
         </div>
 
-        {/* Smart Veto Detection */}
+        {/* Smart Veto Model Configuration */}
         <SettingsSection
           icon={Icons.brain}
           title={t.detection.title}
           description={t.detection.description}
           defaultOpen={true}
+        >
+          <SmartVetoConfig locale={locale as 'en' | 'ar'} isRTL={isRTL} />
+        </SettingsSection>
+
+        {/* Detection Thresholds (Legacy/Quick Settings) */}
+        <SettingsSection
+          icon={Icons.shield}
+          title={locale === 'ar' ? 'إعدادات الكشف السريعة' : 'Quick Detection Settings'}
+          description={locale === 'ar' ? 'تعديل سريع لحدود الكشف' : 'Quick threshold adjustments'}
         >
           <div className="space-y-6">
             <SliderSetting
