@@ -408,7 +408,7 @@ export default function LivePage() {
       minPoseScore: 0.25,
     };
 
-    poseDetectorRef.current = await poseDetection.createDetector(model, detectorConfig);
+    poseDetectorRef.current = await poseDetection.createDetector(model, detectorConfig) as PoseDetector;
   };
 
   // Start webcam
@@ -1339,6 +1339,8 @@ export default function LivePage() {
 
     // De-duplicate skeletons that are too close (same person detected twice)
     // Compare center of mass of each skeleton, filter out duplicates
+    // Threshold: 80px in sent frame coordinates (increased from 50px for better dedup)
+    const DEDUP_THRESHOLD = 80;
     const dedupedSkeletons = skeletons.filter((skeleton, index) => {
       // Calculate center of mass for this skeleton using visible keypoints
       let sumX = 0, sumY = 0, count = 0;
@@ -1353,7 +1355,7 @@ export default function LivePage() {
       const centerX = sumX / count;
       const centerY = sumY / count;
 
-      // Check if any earlier skeleton is too close (within 50px threshold)
+      // Check if any earlier skeleton is too close (within threshold)
       for (let i = 0; i < index; i++) {
         let sumX2 = 0, sumY2 = 0, count2 = 0;
         skeletons[i].forEach(kp => {
@@ -1367,7 +1369,7 @@ export default function LivePage() {
           const centerX2 = sumX2 / count2;
           const centerY2 = sumY2 / count2;
           const distance = Math.sqrt((centerX - centerX2) ** 2 + (centerY - centerY2) ** 2);
-          if (distance < 50) {
+          if (distance < DEDUP_THRESHOLD) {
             return false; // Skip this skeleton, it's a duplicate
           }
         }
