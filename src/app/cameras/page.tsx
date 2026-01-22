@@ -121,6 +121,21 @@ export default function RecordingsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Open recording modal - initialize state before setting selectedRecording
+  const openRecording = useCallback((incident: Incident) => {
+    setLoadingMedia(true);
+    setCurrentScreenshotIndex(0);
+    setShowDeleteConfirm(false);
+    setIncidentMedia(null);
+    setSelectedRecording(incident);
+  }, []);
+
+  // Close recording modal
+  const closeRecording = useCallback(() => {
+    setSelectedRecording(null);
+    setIncidentMedia(null);
+  }, []);
+
   // Handle incident deletion
   const handleDelete = async () => {
     if (!selectedRecording) return;
@@ -136,30 +151,37 @@ export default function RecordingsPage() {
     }
 
     // Close modal and refresh list
-    setSelectedRecording(null);
+    closeRecording();
     setShowDeleteConfirm(false);
     refresh();
   };
 
-  // Fetch incident media when a recording is selected
+  // Fetch incident media when a recording is selected (async only, no sync setState)
   useEffect(() => {
-    if (selectedRecording) {
-      setLoadingMedia(true);
-      setCurrentScreenshotIndex(0);
-      setShowDeleteConfirm(false); // Reset delete confirmation
-      getIncidentMedia(selectedRecording.id)
-        .then((media) => {
+    if (!selectedRecording) return;
+
+    let cancelled = false;
+
+    getIncidentMedia(selectedRecording.id)
+      .then((media) => {
+        if (!cancelled) {
           setIncidentMedia(media);
           console.log('[Cameras] Loaded incident media:', media);
-        })
-        .catch((err) => {
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) {
           console.error('[Cameras] Error loading media:', err);
           setIncidentMedia(null);
-        })
-        .finally(() => setLoadingMedia(false));
-    } else {
-      setIncidentMedia(null);
-    }
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setLoadingMedia(false);
+        }
+      });
+
+    return () => { cancelled = true; };
   }, [selectedRecording]);
 
   // Filter incidents by tab (only show ones with video/thumbnail)
@@ -279,7 +301,7 @@ export default function RecordingsPage() {
                   <Card
                     key={incident.id}
                     className="bg-slate-900 border-slate-800 hover:border-slate-700 transition-colors cursor-pointer overflow-hidden active:scale-[0.98]"
-                    onClick={() => setSelectedRecording(incident)}
+                    onClick={() => openRecording(incident)}
                   >
                     {/* Thumbnail */}
                     <div className="relative aspect-video bg-slate-800">
@@ -344,7 +366,7 @@ export default function RecordingsPage() {
       {selectedRecording && (
         <div
           className="fixed inset-0 bg-black/80 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-          onClick={() => setSelectedRecording(null)}
+          onClick={closeRecording}
         >
           <div
             className="bg-slate-900 border border-slate-700 rounded-t-xl sm:rounded-xl w-full max-w-4xl max-h-[95vh] sm:max-h-[90vh] overflow-hidden"
@@ -362,7 +384,7 @@ export default function RecordingsPage() {
               </div>
               <div className="flex items-center gap-2">
                 {getStatusBadge(selectedRecording.status)}
-                <Button variant="ghost" size="sm" onClick={() => setSelectedRecording(null)} className="min-h-[44px] min-w-[44px] active:scale-95">
+                <Button variant="ghost" size="sm" onClick={closeRecording} className="min-h-[44px] min-w-[44px] active:scale-95">
                   <X className="w-5 h-5" />
                 </Button>
               </div>
