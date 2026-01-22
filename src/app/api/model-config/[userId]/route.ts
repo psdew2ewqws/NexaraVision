@@ -50,30 +50,26 @@ export async function GET(
       } satisfies ModelConfigResponse & { source: string });
     }
 
-    // Try to get user's custom configuration
+    // Try to get user's custom configuration using RPC function (bypasses RLS)
     const { data, error } = await supabase
-      .from('user_model_configurations')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('is_active', true)
-      .single();
+      .rpc('get_user_model_config', { p_user_id: userId });
 
-    if (error && error.code !== 'PGRST116') {
-      // PGRST116 = no rows found (OK - use defaults)
-      // Other errors should be logged
-      console.error('[Model Config API] Supabase error:', error);
+    if (error) {
+      console.error('[Model Config API] Supabase RPC error:', error);
     }
 
-    if (data) {
+    // RPC returns array, check if we have a result with custom config
+    if (data && data.length > 0 && data[0].preset_id !== 'production') {
+      const config = data[0];
       // Return user's custom configuration
       return NextResponse.json({
-        user_id: data.user_id,
-        primary_model: data.primary_model,
-        primary_threshold: data.primary_threshold,
-        veto_model: data.veto_model,
-        veto_threshold: data.veto_threshold,
-        smart_veto_enabled: data.smart_veto_enabled,
-        preset_id: data.preset_id,
+        user_id: userId,
+        primary_model: config.primary_model,
+        primary_threshold: config.primary_threshold,
+        veto_model: config.veto_model,
+        veto_threshold: config.veto_threshold,
+        smart_veto_enabled: config.smart_veto_enabled,
+        preset_id: config.preset_id,
         source: 'custom',
       } satisfies ModelConfigResponse & { source: string });
     }
