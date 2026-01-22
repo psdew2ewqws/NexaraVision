@@ -163,12 +163,15 @@ export function Sidebar() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={() => setMobileOpen(!mobileOpen)}
+            aria-label={mobileOpen ? (locale === 'ar' ? 'إغلاق القائمة' : 'Close menu') : (locale === 'ar' ? 'فتح القائمة' : 'Open menu')}
+            aria-expanded={mobileOpen}
             className={cn(
               "fixed top-3 z-50 p-3 min-h-[48px] min-w-[48px] rounded-2xl md:hidden",
               "bg-slate-900/95 backdrop-blur-xl",
               "border border-white/[0.08]",
               "active:scale-95 transition-transform",
               "flex items-center justify-center",
+              "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900",
               isRTL ? "right-3" : "left-3"
             )}
           >
@@ -241,7 +244,8 @@ export function Sidebar() {
           {!isMobile && !collapsed && (
             <button
               onClick={() => setCollapsed(true)}
-              className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] transition-colors"
+              aria-label={locale === 'ar' ? 'طي الشريط الجانبي' : 'Collapse sidebar'}
+              className="p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               {isRTL ? Icons.chevronRight : Icons.chevronLeft}
             </button>
@@ -252,7 +256,8 @@ export function Sidebar() {
         {!isMobile && collapsed && (
           <button
             onClick={() => setCollapsed(false)}
-            className="mx-auto mt-3 p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] transition-colors"
+            aria-label={locale === 'ar' ? 'توسيع الشريط الجانبي' : 'Expand sidebar'}
+            className="mx-auto mt-3 p-1.5 rounded-lg text-slate-500 hover:text-white hover:bg-white/[0.06] transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {isRTL ? Icons.chevronLeft : Icons.chevronRight}
           </button>
@@ -319,11 +324,13 @@ export function Sidebar() {
           {/* Language - Touch optimized */}
           <button
             onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')}
+            aria-label={locale === 'en' ? 'Switch to Arabic' : 'التبديل إلى الإنجليزية'}
             className={cn(
               "flex items-center gap-3 w-full rounded-lg transition-colors active:scale-[0.98]",
               collapsed ? "justify-center p-2.5 h-10" : "px-3 py-2.5 min-h-[44px]",
               isRTL && !collapsed && "flex-row-reverse",
-              "text-slate-400 hover:text-white hover:bg-white/[0.04]"
+              "text-slate-400 hover:text-white hover:bg-white/[0.04]",
+              "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-inset"
             )}
             title={collapsed ? (locale === 'en' ? 'العربية' : 'English') : undefined}
           >
@@ -338,11 +345,13 @@ export function Sidebar() {
           {/* Logout - Touch optimized */}
           <button
             onClick={handleLogout}
+            aria-label={locale === 'en' ? 'Logout' : 'تسجيل الخروج'}
             className={cn(
               "flex items-center gap-3 w-full rounded-lg transition-colors active:scale-[0.98]",
               collapsed ? "justify-center p-2.5 h-10" : "px-3 py-2.5 min-h-[44px]",
               isRTL && !collapsed && "flex-row-reverse",
-              "text-slate-400 hover:text-red-400 hover:bg-red-500/[0.08]"
+              "text-slate-400 hover:text-red-400 hover:bg-red-500/[0.08]",
+              "focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-inset"
             )}
             title={collapsed ? (locale === 'en' ? 'Logout' : 'تسجيل الخروج') : undefined}
           >

@@ -78,6 +78,9 @@ export function AlertNotification() {
             className="mb-3"
           >
             <motion.div
+              role="alert"
+              aria-live="assertive"
+              aria-atomic="true"
               className={cn(
                 "relative overflow-hidden rounded-2xl bg-black text-white shadow-2xl",
                 "border border-red-500/30",
@@ -139,9 +142,10 @@ export function AlertNotification() {
                       e.stopPropagation();
                       dismissAlert(alert.id);
                     }}
-                    className="p-1 rounded-full hover:bg-white/10 transition-colors"
+                    aria-label={locale === 'ar' ? 'تجاهل التنبيه' : 'Dismiss alert'}
+                    className="p-1 rounded-full hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white/50"
                   >
-                    <X className="h-4 w-4 text-neutral-400" />
+                    <X className="h-4 w-4 text-neutral-400" aria-hidden="true" />
                   </button>
                 </div>
               </motion.div>
@@ -174,12 +178,13 @@ export function AlertNotification() {
                         onClick={() => acknowledgeAlert(alert.id)}
                         className={cn(
                           "flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-colors",
+                          "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-slate-800",
                           alert.status === 'acknowledged'
-                            ? "bg-green-500/20 text-green-400 border border-green-500/30"
-                            : "bg-blue-500 text-white hover:bg-blue-600"
+                            ? "bg-green-500/20 text-green-400 border border-green-500/30 focus:ring-green-500"
+                            : "bg-blue-500 text-white hover:bg-blue-600 focus:ring-blue-500"
                         )}
                       >
-                        <Shield className="h-4 w-4 inline mr-2" />
+                        <Shield className="h-4 w-4 inline mr-2" aria-hidden="true" />
                         {alert.status === 'acknowledged'
                           ? (locale === 'ar' ? 'تم التأكيد' : 'Acknowledged')
                           : (locale === 'ar' ? 'تأكيد' : 'Acknowledge')
@@ -190,7 +195,7 @@ export function AlertNotification() {
                           // Navigate to alerts page to see full details
                           window.location.href = '/alerts';
                         }}
-                        className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors"
+                        className="flex-1 py-2 px-4 rounded-lg text-sm font-medium bg-red-500 text-white hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-slate-800"
                       >
                         {locale === 'ar' ? 'عرض التفاصيل' : 'View Details'}
                       </button>
