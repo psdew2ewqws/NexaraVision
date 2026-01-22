@@ -316,14 +316,14 @@ export async function withRetry<T>(
 export function createWebSocketErrorHandler(context: string) {
   return {
     onError: (event: Event) => {
-      console.error(`[WebSocket Error] ${context}:`, {
+      log.error(`[WebSocket Error] ${context}:`, {
         type: event.type,
         timestamp: new Date().toISOString(),
       });
     },
     onClose: (event: CloseEvent) => {
       if (!event.wasClean) {
-        console.warn(`[WebSocket Close] ${context}: Unclean close`, {
+        log.warn(`[WebSocket Close] ${context}: Unclean close`, {
           code: event.code,
           reason: event.reason,
           timestamp: new Date().toISOString(),
@@ -331,7 +331,7 @@ export function createWebSocketErrorHandler(context: string) {
       }
     },
     handleMessageError: (error: unknown, rawMessage: string) => {
-      console.error(`[WebSocket Parse Error] ${context}:`, {
+      log.error(`[WebSocket Parse Error] ${context}:`, {
         error: parseSupabaseError(error),
         messagePreview: rawMessage.substring(0, 100),
         timestamp: new Date().toISOString(),

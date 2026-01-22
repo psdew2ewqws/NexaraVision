@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 import { Locale, defaultLocale, localeDirection } from './config';
+import { i18nLogger as log } from '@/lib/logger';
 
 interface LanguageContextType {
   locale: Locale;
@@ -47,7 +48,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
       try {
         localStorage.setItem(STORAGE_KEY, locale);
       } catch (e) {
-        console.warn('Unable to save to localStorage:', e);
+        log.warn('Unable to save to localStorage:', e);
       }
     }
   }, [locale]);

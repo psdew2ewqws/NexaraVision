@@ -6,6 +6,7 @@ import { AlertTriangle, X, MapPin, Clock, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useLanguage } from '@/i18n/LanguageContext';
 import { useAlertContext, AlertData } from '@/contexts/AlertContext';
+import { alertLogger as log } from '@/lib/logger';
 
 export function AlertNotification() {
   const { alerts, dismissAlert, acknowledgeAlert, realtimeStatus, triggerTestAlert } = useAlertContext();
@@ -209,5 +210,5 @@ export function AlertNotification() {
 export function triggerAlert(_alert: Omit<AlertData, 'id' | 'timestamp' | 'incident_id'> & { incident_id?: string }) {
   // This is now a no-op since we use Supabase realtime
   // Alerts are automatically triggered when incidents are created in the database
-  console.warn('[AlertNotification] triggerAlert is deprecated - use Supabase INSERT instead');
+  log.warn('[AlertNotification] triggerAlert is deprecated - use Supabase INSERT instead');
 }
