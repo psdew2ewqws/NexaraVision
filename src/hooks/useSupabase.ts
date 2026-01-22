@@ -4,6 +4,13 @@ import { useEffect, useState } from 'react';
 import { getSupabase } from '@/lib/supabase/client';
 import { validateIncidentData, clamp } from '@/lib/validation';
 import { DETECTION } from '@/constants/detection';
+import { createLogger, incidentLogger, cameraLogger, storageLogger, alertLogger } from '@/lib/logger';
+
+// Module-specific loggers
+const throttleLog = createLogger('Throttle');
+const dashLog = createLogger('Dashboard');
+const locLog = createLogger('Locations');
+const mediaLog = createLogger('Media');
 
 // Get supabase client once at module level
 const supabase = getSupabase();
@@ -24,7 +31,7 @@ interface ActiveIncident {
 async function getActiveIncidentForCamera(cameraId: string): Promise<ActiveIncident | null> {
   const cutoffTime = new Date(Date.now() - DETECTION.INCIDENT_GROUP_WINDOW_MS).toISOString();
 
-  console.log('[Throttle] Checking for recent incidents...', { cameraId, cutoffTime });
+  throttleLog.debug('[Throttle] Checking for recent incidents...', { cameraId, cutoffTime });
 
   try {
     // Query database for recent incidents from this camera
@@ -40,13 +47,13 @@ async function getActiveIncidentForCamera(cameraId: string): Promise<ActiveIncid
     if (error) {
       // PGRST116 = no rows returned, which is expected
       if (error.code !== 'PGRST116') {
-        console.error('[Throttle] Database query failed:', error.message);
+        throttleLog.error('[Throttle] Database query failed:', error.message);
       }
       return null;
     }
 
     if (recentIncident) {
-      console.log('[Throttle] ✅ Found active incident:', recentIncident.id);
+      throttleLog.debug('[Throttle] ✅ Found active incident:', recentIncident.id);
       return {
         incidentId: recentIncident.id,
         cameraId: recentIncident.camera_id,
@@ -57,7 +64,7 @@ async function getActiveIncidentForCamera(cameraId: string): Promise<ActiveIncid
 
     return null;
   } catch (err: unknown) {
-    console.error('[Throttle] Error checking active incidents:', (err as Error)?.message);
+    throttleLog.error('[Throttle] Error checking active incidents:', (err as Error)?.message);
     return null;
   }
 }
@@ -169,10 +176,10 @@ export function useCameras() {
         if (!mounted) return;
 
         if (fetchError) {
-          console.error('[useCameras] Fetch error:', fetchError.message);
+          cameraLogger.error('[useCameras] Fetch error:', fetchError.message);
           setError(fetchError.message);
         } else {
-          console.log('[useCameras] Fetched', data?.length || 0, 'cameras');
+          cameraLogger.debug('[useCameras] Fetched', data?.length || 0, 'cameras');
           setCameras((data as Camera[]) || []);
           setError(null);
         }
@@ -180,7 +187,7 @@ export function useCameras() {
         if (!mounted) return;
         const error = err as Error;
         if (error?.name === 'AbortError') return;
-        console.error('[useCameras] Error:', error?.message || err);
+        cameraLogger.error('[useCameras] Error:', error?.message || err);
         setError('Failed to fetch cameras');
       } finally {
         if (mounted) setLoading(false);
@@ -229,11 +236,11 @@ export function useIncidents(limit = 50) {
         if (!mounted) return;
 
         if (fetchError) {
-          console.error('[useIncidents] Fetch error:', fetchError.message, fetchError.code);
+          incidentLogger.error('[useIncidents] Fetch error:', fetchError.message, fetchError.code);
           setError(fetchError.message);
           setIncidents([]);
         } else {
-          console.log('[useIncidents] Fetched', data?.length || 0, 'incidents');
+          incidentLogger.debug('[useIncidents] Fetched', data?.length || 0, 'incidents');
           setIncidents((data as Incident[]) || []);
           setError(null);
         }
@@ -242,10 +249,10 @@ export function useIncidents(limit = 50) {
         const error = err as Error;
         // Ignore AbortError from component unmount
         if (error?.name === 'AbortError') {
-          console.log('[useIncidents] Request aborted (component unmount)');
+          incidentLogger.debug('[useIncidents] Request aborted (component unmount)');
           return;
         }
-        console.error('[useIncidents] Error:', error?.message || err);
+        incidentLogger.error('[useIncidents] Error:', error?.message || err);
         setError('Failed to fetch incidents');
         setIncidents([]);
       } finally {
@@ -321,12 +328,12 @@ export function useIncidentsPaginated(options: PaginationOptions) {
         if (!mounted) return;
 
         if (fetchError) {
-          console.error('[useIncidentsPaginated] Fetch error:', fetchError.message);
+          incidentLogger.error('[useIncidentsPaginated] Fetch error:', fetchError.message);
           setError(fetchError.message);
           setIncidents([]);
           setTotalCount(0);
         } else {
-          console.log('[useIncidentsPaginated] Fetched', data?.length || 0, 'of', count, 'incidents');
+          incidentLogger.debug('[useIncidentsPaginated] Fetched', data?.length || 0, 'of', count, 'incidents');
           setIncidents((data as Incident[]) || []);
           setTotalCount(count || 0);
           setError(null);
@@ -335,7 +342,7 @@ export function useIncidentsPaginated(options: PaginationOptions) {
         if (!mounted) return;
         const error = err as Error;
         if (error?.name === 'AbortError') return;
-        console.error('[useIncidentsPaginated] Error:', error?.message || err);
+        incidentLogger.error('[useIncidentsPaginated] Error:', error?.message || err);
         setError('Failed to fetch incidents');
         setIncidents([]);
         setTotalCount(0);
@@ -393,7 +400,7 @@ export function useLocations() {
         }
       } catch (err: unknown) {
         if (!mounted) return;
-        console.error('[useLocations] Error:', (err as Error)?.message || err);
+        locLog.error('[useLocations] Error:', (err as Error)?.message || err);
         setError('Failed to fetch locations');
       } finally {
         if (mounted) setLoading(false);
@@ -466,7 +473,7 @@ export function useDashboardStats() {
           avgResponseTime,
         });
       } catch (err) {
-        console.error('Failed to fetch dashboard stats:', err);
+        dashLog.error('Failed to fetch dashboard stats:', err);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -507,7 +514,7 @@ export async function updateIncidentStatus(
 
 /** Delete an incident and its associated media files */
 export async function deleteIncident(incidentId: string): Promise<{ error: Error | null }> {
-  console.log('[Incident] Deleting incident:', incidentId);
+  incidentLogger.debug('[Incident] Deleting incident:', incidentId);
 
   try {
     // First delete all media files from storage
@@ -522,10 +529,10 @@ export async function deleteIncident(incidentId: string): Promise<{ error: Error
         .remove(filePaths);
 
       if (storageError) {
-        console.warn('[Incident] Failed to delete media files:', storageError.message);
+        incidentLogger.warn('[Incident] Failed to delete media files:', storageError.message);
         // Continue with incident deletion even if storage cleanup fails
       } else {
-        console.log('[Incident] Deleted', filePaths.length, 'media files');
+        incidentLogger.debug('[Incident] Deleted', filePaths.length, 'media files');
       }
     }
 
@@ -536,15 +543,15 @@ export async function deleteIncident(incidentId: string): Promise<{ error: Error
       .eq('id', incidentId);
 
     if (error) {
-      console.error('[Incident] Delete failed:', error.message);
+      incidentLogger.error('[Incident] Delete failed:', error.message);
       return { error: new Error(error.message) };
     }
 
-    console.log('[Incident] ✅ Deleted successfully');
+    incidentLogger.debug('[Incident] ✅ Deleted successfully');
     return { error: null };
   } catch (err: unknown) {
     const error = err as Error;
-    console.error('[Incident] Delete exception:', error?.message);
+    incidentLogger.error('[Incident] Delete exception:', error?.message);
     return { error };
   }
 }
@@ -562,7 +569,7 @@ export async function createIncident(data: {
   // GAP-CQ-004 Fix: Validate input data
   const validation = validateIncidentData(data);
   if (!validation.valid) {
-    console.warn('[Incident] Validation failed:', validation.errors);
+    incidentLogger.warn('[Incident] Validation failed:', validation.errors);
     // Don't reject - just clamp confidence and continue with warning
   }
 
@@ -590,7 +597,7 @@ const RECORDINGS_BUCKET = 'recordings';
 async function uploadVideoToStorage(incidentId: string, videoBlob: Blob): Promise<string | null> {
   const fileName = `incidents/${incidentId}/video_${Date.now()}.webm`;
 
-  console.log('[Storage] Uploading video...', { fileName, size: videoBlob.size });
+  storageLogger.debug('[Storage] Uploading video...', { fileName, size: videoBlob.size });
 
   try {
     const { error } = await supabase.storage
@@ -602,7 +609,7 @@ async function uploadVideoToStorage(incidentId: string, videoBlob: Blob): Promis
       });
 
     if (error) {
-      console.error('[Storage] Video upload failed:', error.message);
+      storageLogger.error('[Storage] Video upload failed:', error.message);
       return null;
     }
 
@@ -611,10 +618,10 @@ async function uploadVideoToStorage(incidentId: string, videoBlob: Blob): Promis
       .from(RECORDINGS_BUCKET)
       .getPublicUrl(fileName);
 
-    console.log('[Storage] Video uploaded successfully:', urlData.publicUrl);
+    storageLogger.debug('[Storage] Video uploaded successfully:', urlData.publicUrl);
     return urlData.publicUrl;
   } catch (err: unknown) {
-    console.error('[Storage] Video upload exception:', (err as Error)?.message || err);
+    storageLogger.error('[Storage] Video upload exception:', (err as Error)?.message || err);
     return null;
   }
 }
@@ -623,7 +630,7 @@ async function uploadVideoToStorage(incidentId: string, videoBlob: Blob): Promis
 async function uploadThumbnailToStorage(incidentId: string, thumbnailBlob: Blob): Promise<string | null> {
   const fileName = `incidents/${incidentId}/thumbnail_${Date.now()}.jpg`;
 
-  console.log('[Storage] Uploading thumbnail...', { fileName, size: thumbnailBlob.size });
+  storageLogger.debug('[Storage] Uploading thumbnail...', { fileName, size: thumbnailBlob.size });
 
   try {
     const { error } = await supabase.storage
@@ -635,7 +642,7 @@ async function uploadThumbnailToStorage(incidentId: string, thumbnailBlob: Blob)
       });
 
     if (error) {
-      console.error('[Storage] Thumbnail upload failed:', error.message);
+      storageLogger.error('[Storage] Thumbnail upload failed:', error.message);
       return null;
     }
 
@@ -644,10 +651,10 @@ async function uploadThumbnailToStorage(incidentId: string, thumbnailBlob: Blob)
       .from(RECORDINGS_BUCKET)
       .getPublicUrl(fileName);
 
-    console.log('[Storage] Thumbnail uploaded successfully:', urlData.publicUrl);
+    storageLogger.debug('[Storage] Thumbnail uploaded successfully:', urlData.publicUrl);
     return urlData.publicUrl;
   } catch (err: unknown) {
-    console.error('[Storage] Thumbnail upload exception:', (err as Error)?.message || err);
+    storageLogger.error('[Storage] Thumbnail upload exception:', (err as Error)?.message || err);
     return null;
   }
 }
@@ -660,7 +667,7 @@ async function updateIncidentWithUrls(incidentId: string, video_url?: string | n
 
   if (Object.keys(updates).length === 0) return;
 
-  console.log('[Incident] Updating with URLs:', { incidentId, ...updates });
+  incidentLogger.debug('[Incident] Updating with URLs:', { incidentId, ...updates });
 
   const { error } = await supabase
     .from('incidents')
@@ -668,9 +675,9 @@ async function updateIncidentWithUrls(incidentId: string, video_url?: string | n
     .eq('id', incidentId);
 
   if (error) {
-    console.error('[Incident] Failed to update URLs:', error.message);
+    incidentLogger.error('[Incident] Failed to update URLs:', error.message);
   } else {
-    console.log('[Incident] URLs updated successfully');
+    incidentLogger.debug('[Incident] URLs updated successfully');
   }
 }
 
@@ -690,7 +697,7 @@ async function retryOnAbort<T>(
 
       // Check if it's an AbortError (lock timeout)
       if (error?.name === 'AbortError' || error?.message?.includes('abort')) {
-        console.warn(`[Supabase] AbortError on attempt ${attempt}/${maxRetries}, retrying in ${delayMs}ms...`);
+        storageLogger.warn(`[Supabase] AbortError on attempt ${attempt}/${maxRetries}, retrying in ${delayMs}ms...`);
         if (attempt < maxRetries) {
           await new Promise(resolve => setTimeout(resolve, delayMs * attempt)); // Exponential backoff
           continue;
@@ -711,7 +718,7 @@ export async function createIncidentWithRecording(data: {
   videoBlob?: Blob;
   thumbnailBlob?: Blob;
 }) {
-  console.log('[Incident] createIncidentWithRecording called', {
+  incidentLogger.debug('[Incident] createIncidentWithRecording called', {
     camera_id: data.camera_id,
     location_id: data.location_id,
     confidence: data.confidence,
@@ -723,7 +730,7 @@ export async function createIncidentWithRecording(data: {
   // GAP-CQ-004 Fix: Validate input data
   const validation = validateIncidentData(data);
   if (!validation.valid) {
-    console.warn('[Incident] Validation warnings:', validation.errors);
+    incidentLogger.warn('[Incident] Validation warnings:', validation.errors);
   }
 
   // Ensure confidence is within valid range
@@ -737,10 +744,10 @@ export async function createIncidentWithRecording(data: {
 
     const { data: authData, error: authError } = authResult;
     if (authError || !authData?.user) {
-      console.error('[Incident] ❌ Not authenticated:', authError?.message || 'No user');
+      incidentLogger.error('[Incident] ❌ Not authenticated:', authError?.message || 'No user');
       return { incident: null, error: { message: 'Not authenticated', code: 'AUTH_ERROR' }, video_url: undefined, thumbnail_url: undefined, throttled: false };
     }
-    console.log('[Incident] ✅ Auth verified for user:', authData.user.email);
+    incidentLogger.debug('[Incident] ✅ Auth verified for user:', authData.user.email);
 
     // ============================================
     // THROTTLING & GROUPING CHECK (Database-based)
@@ -749,12 +756,12 @@ export async function createIncidentWithRecording(data: {
 
     if (activeIncident) {
       // There's an active incident for this camera - add screenshot instead of new incident
-      console.log('[Throttle] 🔄 Active incident exists:', activeIncident.incidentId,
+      throttleLog.debug('[Throttle] 🔄 Active incident exists:', activeIncident.incidentId,
         '- Adding screenshot instead of new incident');
 
       // Get current screenshot count from storage
       const currentScreenshotCount = await getIncidentScreenshotCount(activeIncident.incidentId);
-      console.log('[Throttle] Current screenshot count:', currentScreenshotCount);
+      throttleLog.debug('[Throttle] Current screenshot count:', currentScreenshotCount);
 
       // Add screenshot if provided and under limit
       if (data.thumbnailBlob && currentScreenshotCount < DETECTION.MAX_SCREENSHOTS_PER_INCIDENT) {
@@ -779,7 +786,7 @@ export async function createIncidentWithRecording(data: {
     // ============================================
     // CREATE NEW INCIDENT
     // ============================================
-    console.log('[Incident] 🆕 No active incident - creating new one...');
+    incidentLogger.debug('[Incident] 🆕 No active incident - creating new one...');
 
     const insertData = {
       camera_id: data.camera_id,
@@ -789,7 +796,7 @@ export async function createIncidentWithRecording(data: {
       status: 'detected',
       detected_at: new Date().toISOString(),
     };
-    console.log('[Incident] Insert payload:', JSON.stringify(insertData));
+    incidentLogger.debug('[Incident] Insert payload:', JSON.stringify(insertData));
 
     // Use retry wrapper to handle potential AbortError on insert
     const insertResult = await retryOnAbort(async () => {
@@ -803,7 +810,7 @@ export async function createIncidentWithRecording(data: {
     const { data: incident, error } = insertResult;
 
     if (error) {
-      console.error('[Incident] ❌ DB insert failed:', {
+      incidentLogger.error('[Incident] ❌ DB insert failed:', {
         message: error.message,
         code: error.code,
         details: error.details,
@@ -811,14 +818,14 @@ export async function createIncidentWithRecording(data: {
       });
       // Check common issues
       if (error.code === '42501') {
-        console.error('[Incident] ⚠️ RLS policy blocked insert - run the migration: 20260121_fix_rls_policies.sql');
+        incidentLogger.error('[Incident] ⚠️ RLS policy blocked insert - run the migration: 20260121_fix_rls_policies.sql');
       } else if (error.code === '23503') {
-        console.error('[Incident] ⚠️ Foreign key violation - camera or location does not exist');
+        incidentLogger.error('[Incident] ⚠️ Foreign key violation - camera or location does not exist');
       }
       return { incident: null, error, video_url: undefined, thumbnail_url: undefined, throttled: false };
     }
 
-    console.log('[Incident] ✅ Created successfully:', incident?.id);
+    incidentLogger.debug('[Incident] ✅ Created successfully:', incident?.id);
 
     // Step 2: Upload video and thumbnail in background (non-blocking)
     // This allows the incident to be created immediately while uploads happen async
@@ -850,7 +857,7 @@ export async function createIncidentWithRecording(data: {
     const isAbortError = error?.name === 'AbortError' || error?.message?.includes('abort');
 
     if (isAbortError) {
-      console.error('[Incident] ❌ AbortError after retries - possible auth lock contention:', error?.message);
+      incidentLogger.error('[Incident] ❌ AbortError after retries - possible auth lock contention:', error?.message);
       return {
         incident: null,
         error: { message: 'Request timed out - please try again', code: 'ABORT_ERROR' },
@@ -860,7 +867,7 @@ export async function createIncidentWithRecording(data: {
       };
     }
 
-    console.error('[Incident] ❌ Exception:', error?.message || err);
+    incidentLogger.error('[Incident] ❌ Exception:', error?.message || err);
     return { incident: null, error: err, video_url: undefined, thumbnail_url: undefined, throttled: false };
   }
 }
@@ -869,7 +876,7 @@ export async function createIncidentWithRecording(data: {
 async function addScreenshotToIncident(incidentId: string, thumbnailBlob: Blob, index: number): Promise<string | null> {
   const fileName = `incidents/${incidentId}/screenshot_${index}_${Date.now()}.jpg`;
 
-  console.log('[Storage] Adding screenshot to incident:', incidentId, 'index:', index);
+  storageLogger.debug('[Storage] Adding screenshot to incident:', incidentId, 'index:', index);
 
   try {
     const { error } = await supabase.storage
@@ -881,7 +888,7 @@ async function addScreenshotToIncident(incidentId: string, thumbnailBlob: Blob, 
       });
 
     if (error) {
-      console.error('[Storage] Screenshot upload failed:', error.message);
+      storageLogger.error('[Storage] Screenshot upload failed:', error.message);
       return null;
     }
 
@@ -889,17 +896,17 @@ async function addScreenshotToIncident(incidentId: string, thumbnailBlob: Blob, 
       .from(RECORDINGS_BUCKET)
       .getPublicUrl(fileName);
 
-    console.log('[Storage] Screenshot added:', urlData.publicUrl);
+    storageLogger.debug('[Storage] Screenshot added:', urlData.publicUrl);
     return urlData.publicUrl;
   } catch (err: unknown) {
-    console.error('[Storage] Screenshot upload exception:', (err as Error)?.message || err);
+    storageLogger.error('[Storage] Screenshot upload exception:', (err as Error)?.message || err);
     return null;
   }
 }
 
 // Update incident peak confidence
 async function updateIncidentPeakConfidence(incidentId: string, newConfidence: number) {
-  console.log('[Incident] Updating peak confidence:', incidentId, 'to', newConfidence);
+  incidentLogger.debug('[Incident] Updating peak confidence:', incidentId, 'to', newConfidence);
 
   try {
     const { error } = await supabase
@@ -908,16 +915,16 @@ async function updateIncidentPeakConfidence(incidentId: string, newConfidence: n
       .eq('id', incidentId);
 
     if (error) {
-      console.error('[Incident] Failed to update peak confidence:', error.message);
+      incidentLogger.error('[Incident] Failed to update peak confidence:', error.message);
     }
   } catch (err: unknown) {
-    console.error('[Incident] Peak confidence update exception:', (err as Error)?.message || err);
+    incidentLogger.error('[Incident] Peak confidence update exception:', (err as Error)?.message || err);
   }
 }
 
 // Background upload function - uploads media and updates incident record
 async function uploadMediaInBackground(incidentId: string, videoBlob?: Blob, thumbnailBlob?: Blob) {
-  console.log('[Background] Starting media upload for incident:', incidentId);
+  storageLogger.debug('[Background] Starting media upload for incident:', incidentId);
 
   try {
     const uploadPromises: Promise<void>[] = [];
@@ -948,19 +955,19 @@ async function uploadMediaInBackground(incidentId: string, videoBlob?: Blob, thu
     // Update incident with URLs
     if (video_url || thumbnail_url) {
       await updateIncidentWithUrls(incidentId, video_url, thumbnail_url);
-      console.log('[Background] Media upload completed:', { incidentId, video_url, thumbnail_url });
+      storageLogger.debug('[Background] Media upload completed:', { incidentId, video_url, thumbnail_url });
     }
   } catch (err: unknown) {
-    console.error('[Background] Media upload failed:', (err as Error)?.message || err);
+    storageLogger.error('[Background] Media upload failed:', (err as Error)?.message || err);
   }
 }
 
 // Upload video for an existing incident (called when recording finishes)
 export async function uploadIncidentVideo(incidentId: string, videoBlob: Blob): Promise<string | null> {
-  console.log('[Incident] Uploading video for existing incident:', incidentId, 'size:', videoBlob.size);
+  incidentLogger.debug('[Incident] Uploading video for existing incident:', incidentId, 'size:', videoBlob.size);
 
   if (!incidentId || !videoBlob || videoBlob.size === 0) {
-    console.warn('[Incident] Invalid incidentId or videoBlob');
+    incidentLogger.warn('[Incident] Invalid incidentId or videoBlob');
     return null;
   }
 
@@ -969,13 +976,13 @@ export async function uploadIncidentVideo(incidentId: string, videoBlob: Blob): 
 
     if (video_url) {
       await updateIncidentWithUrls(incidentId, video_url, null);
-      console.log('[Incident] Video uploaded and incident updated:', video_url);
+      incidentLogger.debug('[Incident] Video uploaded and incident updated:', video_url);
       return video_url;
     }
 
     return null;
   } catch (err: unknown) {
-    console.error('[Incident] Video upload failed:', (err as Error)?.message || err);
+    incidentLogger.error('[Incident] Video upload failed:', (err as Error)?.message || err);
     return null;
   }
 }
@@ -1015,12 +1022,12 @@ export async function findOrCreateCamera(
   sourceUrl?: string,
   customName?: string
 ): Promise<CameraResult> {
-  console.log('[Camera] findOrCreateCamera called:', { sourceType, sourceUrl, customName });
+  cameraLogger.debug('[Camera] findOrCreateCamera called:', { sourceType, sourceUrl, customName });
 
   // First verify we have auth
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {
-    console.error('[Camera] ❌ Not authenticated:', authError?.message || 'No user');
+    cameraLogger.error('[Camera] ❌ Not authenticated:', authError?.message || 'No user');
     return { camera: null, error: { message: 'Not authenticated', code: 'AUTH_ERROR' } };
   }
 
@@ -1075,7 +1082,7 @@ export async function findOrCreateCamera(
   }
 
   if (existing && !findError) {
-    console.log('[Camera] ✅ Found existing camera:', existing.id, existing.name);
+    cameraLogger.debug('[Camera] ✅ Found existing camera:', existing.id, existing.name);
     // Found existing camera, update status to online
     await supabase
       .from('cameras')
@@ -1086,11 +1093,11 @@ export async function findOrCreateCamera(
   }
 
   if (findError) {
-    console.warn('[Camera] Find error (non-critical):', findError.message, findError.code);
+    cameraLogger.warn('[Camera] Find error (non-critical):', findError.message, findError.code);
   }
 
   // Create new camera
-  console.log('[Camera] Creating new camera:', { name, sourceType });
+  cameraLogger.debug('[Camera] Creating new camera:', { name, sourceType });
   const { data: newCamera, error: createError } = await supabase
     .from('cameras')
     .insert([{
@@ -1105,16 +1112,16 @@ export async function findOrCreateCamera(
     .single();
 
   if (createError) {
-    console.error('[Camera] ❌ Failed to create:', {
+    cameraLogger.error('[Camera] ❌ Failed to create:', {
       message: createError.message,
       code: createError.code,
       details: createError.details,
     });
     if (createError.code === '42501') {
-      console.error('[Camera] ⚠️ RLS policy blocked insert - run migration: 20260121_fix_rls_policies.sql');
+      cameraLogger.error('[Camera] ⚠️ RLS policy blocked insert - run migration: 20260121_fix_rls_policies.sql');
     }
   } else {
-    console.log('[Camera] ✅ Created successfully:', newCamera?.id, newCamera?.name);
+    cameraLogger.debug('[Camera] ✅ Created successfully:', newCamera?.id, newCamera?.name);
   }
 
   return { camera: newCamera, error: createError };
@@ -1138,12 +1145,12 @@ interface LocationResult {
 
 // Get or create a default location
 export async function getOrCreateDefaultLocation(): Promise<LocationResult> {
-  console.log('[Location] getOrCreateDefaultLocation called');
+  locLog.debug('[Location] getOrCreateDefaultLocation called');
 
   // First verify we have auth
   const { data: authData, error: authError } = await supabase.auth.getUser();
   if (authError || !authData?.user) {
-    console.error('[Location] ❌ Not authenticated:', authError?.message || 'No user');
+    locLog.error('[Location] ❌ Not authenticated:', authError?.message || 'No user');
     return { location: null, error: { message: 'Not authenticated', code: 'AUTH_ERROR' } };
   }
 
@@ -1156,17 +1163,17 @@ export async function getOrCreateDefaultLocation(): Promise<LocationResult> {
     .single();
 
   if (existing && !findError) {
-    console.log('[Location] ✅ Found existing:', existing.id);
+    locLog.debug('[Location] ✅ Found existing:', existing.id);
     return { location: existing, error: null };
   }
 
   if (findError && findError.code !== 'PGRST116') {
     // PGRST116 = "no rows returned" which is expected
-    console.warn('[Location] Find error (non-critical):', findError.message, findError.code);
+    locLog.warn('[Location] Find error (non-critical):', findError.message, findError.code);
   }
 
   // Create default location
-  console.log('[Location] Creating default location...');
+  locLog.debug('[Location] Creating default location...');
   const { data: newLocation, error: createError } = await supabase
     .from('locations')
     .insert([{
@@ -1178,16 +1185,16 @@ export async function getOrCreateDefaultLocation(): Promise<LocationResult> {
     .single();
 
   if (createError) {
-    console.error('[Location] ❌ Failed to create:', {
+    locLog.error('[Location] ❌ Failed to create:', {
       message: createError.message,
       code: createError.code,
       details: createError.details,
     });
     if (createError.code === '42501') {
-      console.error('[Location] ⚠️ RLS policy blocked insert - run migration: 20260121_fix_rls_policies.sql');
+      locLog.error('[Location] ⚠️ RLS policy blocked insert - run migration: 20260121_fix_rls_policies.sql');
     }
   } else {
-    console.log('[Location] ✅ Created successfully:', newLocation?.id);
+    locLog.debug('[Location] ✅ Created successfully:', newLocation?.id);
   }
 
   return { location: newLocation, error: createError };
@@ -1222,7 +1229,7 @@ export async function getIncidentMedia(incidentId: string): Promise<IncidentMedi
       });
 
     if (error) {
-      console.error('[Storage] Failed to list incident media:', error.message);
+      storageLogger.error('[Storage] Failed to list incident media:', error.message);
       return media;
     }
 
@@ -1245,7 +1252,7 @@ export async function getIncidentMedia(incidentId: string): Promise<IncidentMedi
       }
     }
 
-    console.log('[Storage] Retrieved incident media:', {
+    storageLogger.debug('[Storage] Retrieved incident media:', {
       incidentId,
       screenshots: media.screenshots.length,
       hasVideo: !!media.video_url,
@@ -1253,7 +1260,7 @@ export async function getIncidentMedia(incidentId: string): Promise<IncidentMedi
     });
 
   } catch (err: unknown) {
-    console.error('[Storage] Error retrieving incident media:', (err as Error)?.message || err);
+    storageLogger.error('[Storage] Error retrieving incident media:', (err as Error)?.message || err);
   }
 
   return media;
@@ -1270,13 +1277,13 @@ export async function getCameraIncidents(cameraId: string, limit = 20): Promise<
       .limit(limit);
 
     if (error) {
-      console.error('[Incidents] Failed to fetch camera incidents:', error.message);
+      incidentLogger.error('[Incidents] Failed to fetch camera incidents:', error.message);
       return [];
     }
 
     return (incidents as Incident[]) || [];
   } catch (err: unknown) {
-    console.error('[Incidents] Error fetching camera incidents:', (err as Error)?.message || err);
+    incidentLogger.error('[Incidents] Error fetching camera incidents:', (err as Error)?.message || err);
     return [];
   }
 }
@@ -1362,7 +1369,7 @@ interface IncidentAlertData {
  * Called automatically when a new incident is created
  */
 export async function sendWhatsAppAlerts(alertData: IncidentAlertData): Promise<void> {
-  console.log('[WhatsApp] Starting alert distribution for incident:', alertData.incidentId);
+  alertLogger.debug('[WhatsApp] Starting alert distribution for incident:', alertData.incidentId);
 
   try {
     // Get all users with WhatsApp enabled
@@ -1373,12 +1380,12 @@ export async function sendWhatsAppAlerts(alertData: IncidentAlertData): Promise<
       .not('whatsapp_number', 'is', null);
 
     if (error) {
-      console.error('[WhatsApp] Failed to get recipients:', error.message);
+      alertLogger.error('[WhatsApp] Failed to get recipients:', error.message);
       return;
     }
 
     if (!alertSettings || alertSettings.length === 0) {
-      console.log('[WhatsApp] No users with WhatsApp alerts enabled');
+      alertLogger.debug('[WhatsApp] No users with WhatsApp alerts enabled');
       return;
     }
 
@@ -1387,7 +1394,7 @@ export async function sendWhatsAppAlerts(alertData: IncidentAlertData): Promise<
       (s) => alertData.confidence >= (s.min_confidence || 0)
     );
 
-    console.log(`[WhatsApp] Sending to ${eligibleUsers.length} users (${alertSettings.length} total enabled)`);
+    alertLogger.debug(`[WhatsApp] Sending to ${eligibleUsers.length} users (${alertSettings.length} total enabled)`);
 
     // Send alerts in parallel
     const sendPromises = eligibleUsers.map(async (settings) => {
@@ -1411,7 +1418,7 @@ export async function sendWhatsAppAlerts(alertData: IncidentAlertData): Promise<
 
         // Handle cooldown response - don't log as failure
         if (result.cooldownActive) {
-          console.log(`[WhatsApp] ⏰ Cooldown active for ${settings.whatsapp_number}, ${result.remainingSeconds}s remaining`);
+          alertLogger.debug(`[WhatsApp] ⏰ Cooldown active for ${settings.whatsapp_number}, ${result.remainingSeconds}s remaining`);
           return; // Skip logging to database for cooldown
         }
 
@@ -1427,19 +1434,19 @@ export async function sendWhatsAppAlerts(alertData: IncidentAlertData): Promise<
         });
 
         if (result.success) {
-          console.log('[WhatsApp] ✅ Alert sent to:', settings.whatsapp_number);
+          alertLogger.debug('[WhatsApp] ✅ Alert sent to:', settings.whatsapp_number);
         } else {
-          console.error('[WhatsApp] ❌ Failed to send to:', settings.whatsapp_number, result.error);
+          alertLogger.error('[WhatsApp] ❌ Failed to send to:', settings.whatsapp_number, result.error);
         }
       } catch (err) {
-        console.error('[WhatsApp] ❌ Exception sending to:', settings.whatsapp_number, err);
+        alertLogger.error('[WhatsApp] ❌ Exception sending to:', settings.whatsapp_number, err);
       }
     });
 
     await Promise.all(sendPromises);
-    console.log('[WhatsApp] Alert distribution complete');
+    alertLogger.debug('[WhatsApp] Alert distribution complete');
   } catch (err) {
-    console.error('[WhatsApp] Alert distribution failed:', err);
+    alertLogger.error('[WhatsApp] Alert distribution failed:', err);
   }
 }
 

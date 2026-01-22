@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, useCallback, ReactNode 
 import { RealtimeChannel, REALTIME_SUBSCRIBE_STATES } from '@supabase/supabase-js';
 import { getSupabase } from '@/lib/supabase/client';
 import { useAuth } from './AuthContext';
+import { alertLogger as log } from '@/lib/logger';
 
 // Incident data from Supabase realtime
 interface IncidentPayload {
@@ -86,7 +87,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
       // Remove from notification list
       dismissAlert(id);
     } else {
-      console.error('[AlertContext] Failed to acknowledge:', error);
+      log.error('[AlertContext] Failed to acknowledge:', error);
     }
   }, [user, alerts, supabase, dismissAlert]);
 
@@ -145,11 +146,11 @@ export function AlertProvider({ children }: { children: ReactNode }) {
   // Trigger a test alert by inserting a real incident into the database
   const triggerTestAlert = useCallback(async () => {
     if (!user) {
-      console.warn('[AlertContext] Cannot trigger test alert: not authenticated');
+      log.warn('[AlertContext] Cannot trigger test alert: not authenticated');
       return;
     }
 
-    console.log('[AlertContext] Triggering test alert...');
+    log.debug('[AlertContext] Triggering test alert...');
 
     // First, get or create a test camera and location
     const { data: locations } = await supabase
@@ -179,9 +180,9 @@ export function AlertProvider({ children }: { children: ReactNode }) {
       .single();
 
     if (error) {
-      console.error('[AlertContext] Test alert failed:', error);
+      log.error('[AlertContext] Test alert failed:', error);
     } else {
-      console.log('[AlertContext] Test incident created:', incident?.id);
+      log.debug('[AlertContext] Test incident created:', incident?.id);
     }
   }, [user, supabase]);
 
@@ -197,7 +198,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     let mounted = true;
 
     const setupRealtimeIncidents = async () => {
-      console.log('[AlertContext] Setting up realtime subscription for incidents...');
+      log.debug('[AlertContext] Setting up realtime subscription for incidents...');
       setRealtimeStatus('connecting');
 
       incidentChannel = supabase
@@ -217,7 +218,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
           async (payload) => {
             if (!mounted) return;
 
-            console.log('[AlertContext] 🚨 NEW INCIDENT DETECTED via Realtime:', payload.new);
+            log.debug('[AlertContext] 🚨 NEW INCIDENT DETECTED via Realtime:', payload.new);
 
             const incident = payload.new as IncidentPayload;
             const newAlert = await processIncidentToAlert(incident);
@@ -229,25 +230,25 @@ export function AlertProvider({ children }: { children: ReactNode }) {
             // Play alert sound
             playAlertSound();
 
-            console.log('[AlertContext] ✅ Alert added:', newAlert.id);
+            log.debug('[AlertContext] ✅ Alert added:', newAlert.id);
           }
         )
         .subscribe((status, err) => {
-          console.log('[AlertContext] Subscription status:', status, err ? `Error: ${err.message}` : '');
+          log.debug('[AlertContext] Subscription status:', status, err ? `Error: ${err.message}` : '');
 
           if (!mounted) return;
 
           if (status === REALTIME_SUBSCRIBE_STATES.SUBSCRIBED) {
-            console.log('[AlertContext] ✅ Realtime subscription ACTIVE - listening for incidents');
+            log.debug('[AlertContext] ✅ Realtime subscription ACTIVE - listening for incidents');
             setRealtimeStatus('connected');
           } else if (status === REALTIME_SUBSCRIBE_STATES.CHANNEL_ERROR) {
-            console.error('[AlertContext] ❌ Realtime subscription ERROR:', err);
+            log.error('[AlertContext] ❌ Realtime subscription ERROR:', err);
             setRealtimeStatus('error');
           } else if (status === REALTIME_SUBSCRIBE_STATES.TIMED_OUT) {
-            console.error('[AlertContext] ⏱️ Realtime subscription TIMED OUT');
+            log.error('[AlertContext] ⏱️ Realtime subscription TIMED OUT');
             setRealtimeStatus('error');
           } else if (status === REALTIME_SUBSCRIBE_STATES.CLOSED) {
-            console.log('[AlertContext] Realtime subscription CLOSED');
+            log.debug('[AlertContext] Realtime subscription CLOSED');
             setRealtimeStatus('disconnected');
           }
         });
@@ -258,7 +259,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
       if (incidentChannel) {
-        console.log('[AlertContext] Cleaning up subscription');
+        log.debug('[AlertContext] Cleaning up subscription');
         supabase.removeChannel(incidentChannel);
       }
       setRealtimeStatus('disconnected');
@@ -302,7 +303,7 @@ function playAlertSound() {
     const windowWithWebkit = window as WindowWithWebkitAudio;
     const AudioContextClass = window.AudioContext || windowWithWebkit.webkitAudioContext;
     if (!AudioContextClass) {
-      console.warn('[AlertContext] Web Audio API not supported');
+      log.warn('[AlertContext] Web Audio API not supported');
       return;
     }
     const audioContext = new AudioContextClass();
@@ -321,6 +322,6 @@ function playAlertSound() {
     oscillator.start(audioContext.currentTime);
     oscillator.stop(audioContext.currentTime + 0.3);
   } catch (err) {
-    console.warn('[AlertContext] Sound playback failed:', err);
+    log.warn('[AlertContext] Sound playback failed:', err);
   }
 }

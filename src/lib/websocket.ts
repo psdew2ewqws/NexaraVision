@@ -5,6 +5,8 @@
  * Research: "Replace HTTP polling with WebSocket for real-time updates"
  */
 
+import { wsLogger as log } from '@/lib/logger';
+
 export interface WebSocketMessage {
   type: 'analyze_frames' | 'ping' | 'subscribe' | 'unsubscribe';
   frames?: string[];
@@ -93,7 +95,7 @@ export class DetectionWebSocket {
         this.ws = new WebSocket(this.config.url);
 
         this.ws.onopen = () => {
-          console.log('[WebSocket] Connected to detection server');
+          log.debug('[WebSocket] Connected to detection server');
           this.reconnectAttempts = 0;
           this.notifyStatus('connected');
           this.startHeartbeat();
@@ -124,19 +126,19 @@ export class DetectionWebSocket {
               this.notifyEvent(result);
             }
           } catch (err) {
-            console.error('[WebSocket] Failed to parse message:', err);
+            log.error('[WebSocket] Failed to parse message:', err);
           }
         };
 
         this.ws.onerror = (error) => {
-          console.error('[WebSocket] Error:', error);
+          log.error('[WebSocket] Error:', error);
           this.notifyStatus('error');
           this.notifyError(new Error('WebSocket connection error'));
           reject(error);
         };
 
         this.ws.onclose = (event) => {
-          console.log('[WebSocket] Disconnected:', event.code, event.reason);
+          log.debug('[WebSocket] Disconnected:', event.code, event.reason);
           this.notifyStatus('disconnected');
           this.stopHeartbeat();
 
@@ -170,7 +172,7 @@ export class DetectionWebSocket {
    */
   public analyzeFrames(frames: string[], cameraId?: string): void {
     if (!this.isConnected()) {
-      console.warn('[WebSocket] Not connected, cannot send frames');
+      log.warn('[WebSocket] Not connected, cannot send frames');
       return;
     }
 
@@ -208,17 +210,17 @@ export class DetectionWebSocket {
    */
   private attemptReconnect(): void {
     if (this.reconnectAttempts >= this.config.maxReconnectAttempts) {
-      console.error('[WebSocket] Max reconnect attempts reached');
+      log.error('[WebSocket] Max reconnect attempts reached');
       this.notifyError(new Error('Max reconnect attempts reached'));
       return;
     }
 
     this.reconnectAttempts++;
-    console.log(`[WebSocket] Reconnecting... (attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
+    log.debug(`[WebSocket] Reconnecting... (attempt ${this.reconnectAttempts}/${this.config.maxReconnectAttempts})`);
 
     this.reconnectTimer = setTimeout(() => {
       this.connect().catch((err) => {
-        console.error('[WebSocket] Reconnect failed:', err);
+        log.error('[WebSocket] Reconnect failed:', err);
       });
     }, this.config.reconnectInterval);
   }
@@ -292,7 +294,7 @@ export class DetectionWebSocket {
       try {
         handler(data);
       } catch (err) {
-        console.error('[WebSocket] Event handler error:', err);
+        log.error('[WebSocket] Event handler error:', err);
       }
     });
   }
@@ -305,7 +307,7 @@ export class DetectionWebSocket {
       try {
         handler(error);
       } catch (err) {
-        console.error('[WebSocket] Error handler error:', err);
+        log.error('[WebSocket] Error handler error:', err);
       }
     });
   }
@@ -318,7 +320,7 @@ export class DetectionWebSocket {
       try {
         handler(status);
       } catch (err) {
-        console.error('[WebSocket] Status handler error:', err);
+        log.error('[WebSocket] Status handler error:', err);
       }
     });
   }

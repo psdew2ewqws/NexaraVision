@@ -1,5 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getSupabase } from '@/lib/supabase/client';
+import { createLogger } from '@/lib/logger';
+
+const log = createLogger('DetectionSettings');
 
 export interface DetectionSettings {
   id?: string;
@@ -66,7 +69,7 @@ export function useDetectionSettings(): UseDetectionSettingsResult {
         return loadedSettings;
       }
     } catch (e) {
-      console.error('Failed to parse localStorage settings:', e);
+      log.warn('Failed to parse localStorage settings:', e);
     }
     return null;
   }, []);
@@ -99,7 +102,7 @@ export function useDetectionSettings(): UseDetectionSettingsResult {
             if (fetchError.code === 'PGRST204' || fetchError.code === 'PGRST205' || fetchError.code === '42P01') {
               console.info('[Detection Settings] Table not found - using localStorage. Run the migration to enable cloud sync.');
             } else {
-              console.warn('[Detection Settings] Error loading from Supabase, using localStorage:', fetchError.message || fetchError.code);
+              log.warn('[Detection Settings] Error loading from Supabase, using localStorage:', fetchError.message || fetchError.code);
             }
             // Fall back to localStorage
             loadFromLocalStorage();
@@ -133,7 +136,7 @@ export function useDetectionSettings(): UseDetectionSettingsResult {
           loadFromLocalStorage();
         }
       } catch (err) {
-        console.error('Error in loadSettings:', err);
+        log.error('Error in loadSettings:', err);
         loadFromLocalStorage();
       } finally {
         setIsLoading(false);
@@ -166,7 +169,7 @@ export function useDetectionSettings(): UseDetectionSettingsResult {
         if (upsertError.code === 'PGRST204' || upsertError.code === 'PGRST205' || upsertError.code === '42P01') {
           console.info('[Detection Settings] Table not found - saving to localStorage. Run the migration to enable cloud sync.');
         } else {
-          console.warn('[Detection Settings] Error saving to Supabase:', upsertError.message || upsertError.code);
+          log.warn('[Detection Settings] Error saving to Supabase:', upsertError.message || upsertError.code);
         }
         return false;
       }
@@ -175,7 +178,7 @@ export function useDetectionSettings(): UseDetectionSettingsResult {
       localStorage.removeItem(LEGACY_STORAGE_KEY);
       return true;
     } catch (err) {
-      console.error('Error in saveToSupabase:', err);
+      log.error('Error in saveToSupabase:', err);
       return false;
     }
   };
@@ -217,7 +220,7 @@ export function useDetectionSettings(): UseDetectionSettingsResult {
         return true;
       }
     } catch (err) {
-      console.error('[Detection Settings] Error saving:', err);
+      log.error('[Detection Settings] Error saving:', err);
       setError('Failed to save settings');
       // Fallback to localStorage
       saveToLocalStorage(settings);
@@ -260,7 +263,7 @@ export function getDetectionSettingsFromStorage(): DetectionSettings {
       };
     }
   } catch (e) {
-    console.error('Failed to parse localStorage settings:', e);
+    log.warn('Failed to parse localStorage settings:', e);
   }
   return DEFAULT_DETECTION_SETTINGS;
 }

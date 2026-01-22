@@ -54,6 +54,13 @@ import {
 import { useDetectionSettings } from '@/hooks/useDetectionSettings';
 import { useAlertSettings } from '@/hooks/useAlertSettings';
 import { useAuth } from '@/contexts/AuthContext';
+import { createLogger, wsLogger, incidentLogger, alertLogger, cameraLogger } from '@/lib/logger';
+
+// Module-specific loggers
+const webrtcLog = createLogger('WebRTC');
+const recordingLog = createLogger('Recording');
+const liveLog = createLogger('Live');
+const detectionLog = createLogger('Detection');
 
 // Types
 type SourceType = 'webcam' | 'screen' | 'upload';
@@ -412,7 +419,7 @@ export default function LivePage() {
       }
       return true;
     } catch (err) {
-      console.error('Webcam error:', err);
+      detectionLog.error('Webcam error:', err);
       return false;
     }
   };
@@ -442,7 +449,7 @@ export default function LivePage() {
 
       return true;
     } catch (err) {
-      console.error('Screen share error:', err);
+      detectionLog.error('Screen share error:', err);
       return false;
     }
   };
@@ -491,7 +498,7 @@ export default function LivePage() {
         }
       }
     } catch (err) {
-      console.error('Grid detection error:', err);
+      detectionLog.error('Grid detection error:', err);
       generateManualGrid();
     }
   };
@@ -568,7 +575,7 @@ export default function LivePage() {
       };
 
       dc.onerror = (err) => {
-        console.error('[WebRTC] DataChannel error:', err);
+        webrtcLog.error('[WebRTC] DataChannel error:', err);
         webrtcReadyRef.current = false;
       };
 
@@ -615,7 +622,7 @@ export default function LivePage() {
             }
           }
         } catch (err) {
-          console.error('[WebRTC] Message parse error:', err);
+          webrtcLog.error('[WebRTC] Message parse error:', err);
         }
       };
 
@@ -644,7 +651,7 @@ export default function LivePage() {
       }));
 
     } catch (err) {
-      console.error('[WebRTC] Setup failed:', err);
+      webrtcLog.error('[WebRTC] Setup failed:', err);
       webrtcReadyRef.current = false;
     }
   };
@@ -697,7 +704,7 @@ export default function LivePage() {
                   sdp: data.sdp
                 });
                 pcRef.current.setRemoteDescription(answer)
-                  .catch(err => console.error('[WebRTC] Failed to set remote description:', err));
+                  .catch(err => webrtcLog.error('[WebRTC] Failed to set remote description:', err));
               }
               return;
             }
@@ -783,12 +790,12 @@ export default function LivePage() {
 
             // Unknown message format - ignore silently
           } catch (err) {
-            console.error('WS message error:', err, event.data?.substring?.(0, 100));
+            wsLogger.error('WS message error:', err, event.data?.substring?.(0, 100));
           }
         };
 
         ws.onerror = (err) => {
-          console.error('[WS] Error:', err);
+          wsLogger.error('[WS] Error:', err);
           setStatus('error');
           resolve(false);
         };
@@ -802,7 +809,7 @@ export default function LivePage() {
 
         wsRef.current = ws;
       } catch (err) {
-        console.error('[WS] Failed to create WebSocket:', err);
+        wsLogger.error('[WS] Failed to create WebSocket:', err);
         setStatus('error');
         resolve(false);
       }
@@ -913,10 +920,10 @@ export default function LivePage() {
             defaultLocationRef.current = newLoc;
             setDefaultLocation(newLoc);
           } else {
-            console.error('[Incident] Fallback location failed:', locErr);
+            incidentLogger.error('[Incident] Fallback location failed:', locErr);
           }
         } catch (err) {
-          console.error('[Incident] Location creation exception:', err);
+          incidentLogger.error('[Incident] Location creation exception:', err);
         }
       }
 
@@ -929,10 +936,10 @@ export default function LivePage() {
             activeCameraRef.current = newCam;
             setActiveCamera(newCam);
           } else {
-            console.error('[Incident] Fallback camera failed:', camErr);
+            incidentLogger.error('[Incident] Fallback camera failed:', camErr);
           }
         } catch (err) {
-          console.error('[Incident] Camera creation exception:', err);
+          incidentLogger.error('[Incident] Camera creation exception:', err);
         }
       }
     }
@@ -959,19 +966,19 @@ export default function LivePage() {
       if (incident) {
         currentIncidentIdRef.current = incident.id;
         setDbError(null); // Clear any previous error
-        console.log('[Incident] ✅ Created incident:', incident.id);
+        incidentLogger.debug('[Incident] ✅ Created incident:', incident.id);
 
         // Send WhatsApp alert if enabled - USE REFS to avoid stale closure!
         const currentAlertSettings = alertSettingsRef.current;
         const currentUser = userRef.current;
-        console.log('[WhatsApp] Check enabled:', {
+        alertLogger.debug('[WhatsApp] Check enabled:', {
           whatsapp_enabled: currentAlertSettings?.whatsapp_enabled,
           whatsapp_number: currentAlertSettings?.whatsapp_number,
           userId: currentUser?.id,
         });
 
         if (currentAlertSettings?.whatsapp_enabled && currentAlertSettings?.whatsapp_number && currentUser?.id) {
-          console.log('[WhatsApp] Sending violence alert to:', currentAlertSettings.whatsapp_number);
+          alertLogger.debug('[WhatsApp] Sending violence alert to:', currentAlertSettings.whatsapp_number);
           fetch('/api/whatsapp/send', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -987,19 +994,19 @@ export default function LivePage() {
           }).then(res => res.json())
             .then(data => {
               if (data.success) {
-                console.log('[WhatsApp] ✅ Alert sent successfully:', data.id);
+                alertLogger.debug('[WhatsApp] ✅ Alert sent successfully:', data.id);
               } else if (data.cooldownActive) {
-                console.log('[WhatsApp] ⏱️ Cooldown active, skipped alert');
+                alertLogger.debug('[WhatsApp] ⏱️ Cooldown active, skipped alert');
               } else {
-                console.error('[WhatsApp] ❌ Failed to send alert:', data.error);
+                alertLogger.error('[WhatsApp] ❌ Failed to send alert:', data.error);
               }
             })
-            .catch(err => console.error('[WhatsApp] ❌ Error sending alert:', err));
+            .catch(err => alertLogger.error('[WhatsApp] ❌ Error sending alert:', err));
         } else {
-          console.log('[WhatsApp] Skipped - not configured or user not logged in');
+          alertLogger.debug('[WhatsApp] Skipped - not configured or user not logged in');
         }
       } else if (error) {
-        console.error('[Incident] ❌ Failed to create:', error);
+        incidentLogger.error('[Incident] ❌ Failed to create:', error);
         const errMsg = (error as { message?: string; code?: string })?.message || 'Unknown error';
         const errCode = (error as { code?: string })?.code;
         // Show error to user
@@ -1014,7 +1021,7 @@ export default function LivePage() {
         }]);
       }
     } else if (shouldCreateNewIncident) {
-      console.error('[Incident] ❌ Cannot create - missing camera or location after fallback. Camera:', camera?.id, 'Location:', location?.id);
+      incidentLogger.error('[Incident] ❌ Cannot create - missing camera or location after fallback. Camera:', camera?.id, 'Location:', location?.id);
       setDbError('Cannot save incidents - database setup required. Go to /debug to fix.');
       // Still show alert to user even if DB save failed
       setAlerts((prev) => [...prev, {
@@ -1128,7 +1135,7 @@ export default function LivePage() {
         drawPoses(poses);
         analyzePostures(poses);
       } catch (err) {
-        console.error('Pose detection error:', err);
+        detectionLog.error('Pose detection error:', err);
       }
     } else if (detectionMode === 'server') {
       // Check WebSocket status
@@ -1157,7 +1164,7 @@ export default function LivePage() {
           try {
             const arrayBuffer = await blob.arrayBuffer();
             dcRef.current.send(arrayBuffer);
-            // console.log('[WebRTC] Frame sent via DataChannel');
+            // webrtcLog.debug('[WebRTC] Frame sent via DataChannel');
           } catch {
             // DataChannel send failed - falling back to WebSocket
             webrtcReadyRef.current = false;
@@ -1487,7 +1494,7 @@ export default function LivePage() {
         setRecordingTimeLeft((prev) => Math.max(0, prev - 1));
       }, 1000);
     } catch (err) {
-      console.error('[Recording] Failed to start:', err);
+      recordingLog.error('[Recording] Failed to start:', err);
     }
   }, []);
 
@@ -1586,7 +1593,7 @@ export default function LivePage() {
       defaultLocationRef.current = location; // Set ref immediately for WebSocket callback
       setDbError(null); // Clear any previous error
     } else {
-      console.error('[Live] Failed to get/create location:', locationError);
+      liveLog.error('[Live] Failed to get/create location:', locationError);
       const errCode = (locationError as { code?: string })?.code;
       if (errCode === '42501' || errCode === 'AUTH_ERROR') {
         setDbError('Database setup required - incidents won\'t be saved. Click "Fix Now" to resolve.');
@@ -1617,10 +1624,10 @@ export default function LivePage() {
         setActiveCamera(camera);
         activeCameraRef.current = camera; // Set ref immediately for WebSocket callback
       } else {
-        console.error('[Live] Camera registration failed:', cameraError);
+        liveLog.error('[Live] Camera registration failed:', cameraError);
       }
     } catch (err) {
-      console.error('[Live] Camera registration error:', err);
+      liveLog.error('[Live] Camera registration error:', err);
     }
 
     let success = false;
@@ -2110,7 +2117,8 @@ export default function LivePage() {
                 <canvas ref={overlayCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ transform: source === 'webcam' ? 'scaleX(-1)' : 'none', opacity: showProcessedFrame ? 0 : 1 }} />
 
                 {/* Server-rendered frame with skeleton (zero-delay, perfectly synced) */}
-                <canvas ref={processedFrameCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ transform: source === 'webcam' ? 'scaleX(-1)' : 'none' }} />
+                {/* CRITICAL: opacity control prevents double skeleton when switching between server/client rendering */}
+                <canvas ref={processedFrameCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" style={{ transform: source === 'webcam' ? 'scaleX(-1)' : 'none', opacity: showProcessedFrame ? 1 : 0 }} />
 
                 {/* Violence Indicator Overlay */}
                 <AnimatePresence>

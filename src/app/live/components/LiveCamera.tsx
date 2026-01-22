@@ -34,6 +34,11 @@ import {
 } from '@/components/ui/texture-card';
 import { TextureButton } from '@/components/ui/texture-button';
 import { useSimpleFrameEncoder } from '@/hooks/useFrameEncoder';
+import { createLogger, wsLogger, alertLogger } from '@/lib/logger';
+
+const poseLog = createLogger('Pose');
+const vastaiLog = createLogger('Vast.ai');
+const detectionLog = createLogger('Detection');
 
 // TensorFlow.js type definitions for browser-side pose detection
 interface TensorFlowBackend {
@@ -265,7 +270,7 @@ export function LiveCamera() {
       poseDetectorRef.current = await window.poseDetection.createDetector(model, detectorConfig);
       setBackend('TFJS-WebGL');
     } catch (err) {
-      console.error('Failed to load pose model:', err);
+      poseLog.error('Failed to load pose model:', err);
       setError('Failed to load pose detection model');
     } finally {
       setModelLoading(false);
@@ -339,7 +344,7 @@ export function LiveCamera() {
     } catch (err) {
       // GAP-ERR-004 Fix: Log detailed error and track failures
       const errorMessage = err instanceof Error ? err.message : 'Unknown pose detection error';
-      console.error('[Pose] Detection failed:', errorMessage);
+      poseLog.error('[Pose] Detection failed:', errorMessage);
       // Optionally notify user after repeated failures (not implemented to avoid noise)
     } finally {
       setIsAnalyzing(false);
@@ -453,11 +458,11 @@ export function LiveCamera() {
         return;
       }
 
-      console.log('[Vast.ai] Connecting to WebSocket:', VASTAI_WS_URL);
+      vastaiLog.debug('[Vast.ai] Connecting to WebSocket:', VASTAI_WS_URL);
       const ws = new WebSocket(VASTAI_WS_URL);
 
       ws.onopen = () => {
-        console.log('[Vast.ai] WebSocket connected');
+        vastaiLog.debug('[Vast.ai] WebSocket connected');
         setWsConnected(true);
         setBackend('Vast.ai GPU');
         vastaiWsRef.current = ws;
@@ -471,19 +476,19 @@ export function LiveCamera() {
         } catch (err) {
           // GAP-ERR-001 Fix: Log with details and notify user of malformed response
           const errorMessage = err instanceof Error ? err.message : 'Unknown parse error';
-          console.error('[Vast.ai] Failed to parse response:', errorMessage, 'Raw:', event.data?.substring(0, 100));
+          vastaiLog.error('[Vast.ai] Failed to parse response:', errorMessage, 'Raw:', event.data?.substring(0, 100));
           // Don't set error state here to avoid disrupting detection, just log
         }
       };
 
       ws.onerror = (err) => {
-        console.error('[Vast.ai] WebSocket error:', err);
+        vastaiLog.error('[Vast.ai] WebSocket error:', err);
         setWsConnected(false);
         reject(new Error('WebSocket connection failed'));
       };
 
       ws.onclose = () => {
-        console.log('[Vast.ai] WebSocket closed');
+        vastaiLog.debug('[Vast.ai] WebSocket closed');
         setWsConnected(false);
         vastaiWsRef.current = null;
       };
@@ -500,13 +505,13 @@ export function LiveCamera() {
 
   const handleVastaiResponse = (data: VastaiResponse) => {
     if (data.error) {
-      console.error('[Vast.ai] Error:', data.error);
+      vastaiLog.error('[Vast.ai] Error:', data.error);
       return;
     }
 
     // Skip non-result messages
     if (data.type !== 'result') {
-      console.log('[Vast.ai] Non-result message:', data.type);
+      vastaiLog.debug('[Vast.ai] Non-result message:', data.type);
       return;
     }
 
@@ -678,7 +683,7 @@ export function LiveCamera() {
         handleViolenceDetected(result.violence_probability);
       }
     } catch (err) {
-      console.error('Server analysis failed:', err);
+      detectionLog.error('Server analysis failed:', err);
     } finally {
       setIsAnalyzing(false);
     }
@@ -738,7 +743,7 @@ export function LiveCamera() {
           const userMessage = isTimeout
             ? 'Connection to Vast.ai server timed out. Server may be unavailable.'
             : `Failed to connect to Vast.ai server: ${errorMessage}`;
-          console.error('[Detection] WebSocket connection failed:', errorMessage);
+          detectionLog.error('[Detection] WebSocket connection failed:', errorMessage);
           setError(userMessage);
           setModelLoading(false);
           return;
@@ -828,7 +833,7 @@ export function LiveCamera() {
     // GAP-ERR-003 Fix: Handle audio play failures gracefully (user interaction required)
     audio.play().catch((err) => {
       // Most common cause: autoplay blocked by browser until user interaction
-      console.warn('[Alert] Audio play failed (may need user interaction):', err?.message || 'Autoplay blocked');
+      alertLogger.warn('[Alert] Audio play failed (may need user interaction):', err?.message || 'Autoplay blocked');
     });
 
     const newAlert: AlertType = {

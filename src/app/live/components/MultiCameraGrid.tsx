@@ -5,6 +5,11 @@ import { GridControls } from './GridControls';
 import { CameraCell } from './CameraCell';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
+import { createLogger } from '@/lib/logger';
+
+const gridLog = createLogger('GridDetection');
+const detectionLog = createLogger('Detection');
+const recordingLog = createLogger('Recording');
 
 interface CameraData {
   id: string;
@@ -65,39 +70,39 @@ export function MultiCameraGrid() {
   const detectCameraGrid = async (canvas: HTMLCanvasElement): Promise<{ regions: CameraRegion[]; gridRows: number; gridCols: number } | null> => {
     try {
       setDetectionStatus('🔍 Detecting camera grid...');
-      console.log('[GridDetection] Starting detection...');
-      console.log('[GridDetection] Canvas size:', canvas.width, 'x', canvas.height);
+      gridLog.debug('[GridDetection] Starting detection...');
+      gridLog.debug('[GridDetection] Canvas size:', canvas.width, 'x', canvas.height);
 
       // Convert canvas to blob
       const blob = await new Promise<Blob>((resolve) => {
         canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.9);
       });
-      console.log('[GridDetection] Blob created, size:', blob.size, 'bytes');
+      gridLog.debug('[GridDetection] Blob created, size:', blob.size, 'bytes');
 
       // Send to GridDetector backend
       const formData = new FormData();
       formData.append('screenshot', blob, 'screenshot.jpg');
 
-      console.log('[GridDetection] Sending request to http://localhost:8004/api/detect-grid');
+      gridLog.debug('[GridDetection] Sending request to http://localhost:8004/api/detect-grid');
       const response = await fetch('http://localhost:8004/api/detect-grid', {
         method: 'POST',
         body: formData,
       });
 
-      console.log('[GridDetection] Response status:', response.status, response.statusText);
+      gridLog.debug('[GridDetection] Response status:', response.status, response.statusText);
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error('[GridDetection] Response error:', errorText);
+        gridLog.error('[GridDetection] Response error:', errorText);
         throw new Error(`Grid detection failed: ${response.statusText}`);
       }
 
       const result = await response.json();
-      console.log('[GridDetection] Result:', result);
+      gridLog.debug('[GridDetection] Result:', result);
 
       if (result.success && result.regions && result.regions.length > 0) {
         const statusMsg = `✅ Detected ${result.regions.length} cameras (${result.grid_layout[0]}×${result.grid_layout[1]} grid, confidence: ${(result.confidence * 100).toFixed(0)}%)`;
-        console.log('[GridDetection]', statusMsg);
+        gridLog.debug('[GridDetection]', statusMsg);
         setDetectionStatus(statusMsg);
 
         // Update grid dimensions
@@ -110,12 +115,12 @@ export function MultiCameraGrid() {
           gridCols: result.grid_layout[1],
         };
       } else {
-        console.warn('[GridDetection] Detection failed or no regions found');
+        gridLog.warn('[GridDetection] Detection failed or no regions found');
         setDetectionStatus('⚠️ Auto-detection failed. Using manual grid.');
         return null;
       }
     } catch (err) {
-      console.error('[GridDetection] Error:', err);
+      gridLog.error('[GridDetection] Error:', err);
       const errorMsg = err instanceof Error ? err.message : 'Unknown error';
       setDetectionStatus(`❌ Auto-detection error: ${errorMsg}. Using manual grid.`);
       return null;
@@ -181,7 +186,7 @@ export function MultiCameraGrid() {
 
       // Mark all cameras as active using the detected grid dimensions
       const currentTotal = detectedGridRows * detectedGridCols;
-      console.log(`[Recording] Initializing ${currentTotal} cameras (${detectedGridRows}x${detectedGridCols})`);
+      recordingLog.debug(`[Recording] Initializing ${currentTotal} cameras (${detectedGridRows}x${detectedGridCols})`);
       const activeCameras: CameraData[] = [];
       for (let i = 0; i < currentTotal; i++) {
         activeCameras.push({
@@ -205,7 +210,7 @@ export function MultiCameraGrid() {
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Screen recording failed';
       setError(errorMessage);
-      console.error('Failed to start screen recording:', err);
+      recordingLog.error('Failed to start screen recording:', err);
     }
   };
 
@@ -350,11 +355,11 @@ export function MultiCameraGrid() {
       });
 
       if (camerasWithFrames.length === 0) {
-        console.log('[Detection] No cameras with enough frames yet (need 20 frames)');
+        detectionLog.debug('[Detection] No cameras with enough frames yet (need 20 frames)');
         return;
       }
 
-      console.log(`[Detection] Processing ${camerasWithFrames.length} cameras with ML service`);
+      detectionLog.debug(`[Detection] Processing ${camerasWithFrames.length} cameras with ML service`);
 
       // Send detection requests for each camera with enough frames
       const detectionPromises = camerasWithFrames.map(async ({ index, frames }) => {
@@ -368,19 +373,19 @@ export function MultiCameraGrid() {
 
           if (!response.ok) {
             const errorText = await response.text();
-            console.error(`[Detection] Camera ${index} error:`, errorText);
+            detectionLog.error(`[Detection] Camera ${index} error:`, errorText);
             return { index, probability: 0, error: true };
           }
 
           const result = await response.json();
-          console.log(`[Detection] Camera ${index}: ${(result.violence_probability * 100).toFixed(1)}% violence`);
+          detectionLog.debug(`[Detection] Camera ${index}: ${(result.violence_probability * 100).toFixed(1)}% violence`);
           return {
             index,
             probability: result.violence_probability * 100,
             error: false,
           };
         } catch (err) {
-          console.error(`[Detection] Camera ${index} request failed:`, err);
+          detectionLog.error(`[Detection] Camera ${index} request failed:`, err);
           return { index, probability: 0, error: true };
         }
       });
@@ -398,7 +403,7 @@ export function MultiCameraGrid() {
         })
       );
     } catch (err) {
-      console.error('Detection failed:', err);
+      detectionLog.error('Detection failed:', err);
       // Don't show error to user, just log it
       // Detection will retry on next interval
     }
