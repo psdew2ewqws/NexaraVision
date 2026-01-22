@@ -101,6 +101,8 @@ interface ServerDetectionData {
   t_total?: number;
   t_gcn?: number;
   inference_time?: number;
+  // Smart Veto result field - CRITICAL for alert logic
+  result?: 'VIOLENCE' | 'VETOED' | 'SAFE';
   // Browser detection fields
   model_used?: string;
   poses_detected?: number;
@@ -510,14 +512,12 @@ export default function LivePage() {
         }
       };
       wsRef.current.send(JSON.stringify(configMessage));
-      console.log('[WS] Sent config to server:', configMessage.settings);
     }
   }, [detectionSettings]);
 
   // Setup WebRTC DataChannel for low-latency frame transmission
   const setupWebRTC = async () => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.warn('[WebRTC] WebSocket not ready for signaling');
       return;
     }
 
@@ -536,12 +536,10 @@ export default function LivePage() {
       dcRef.current = dc;
 
       dc.onopen = () => {
-        console.log('[WebRTC] DataChannel OPEN - using low-latency UDP!');
         webrtcReadyRef.current = true;
       };
 
       dc.onclose = () => {
-        console.log('[WebRTC] DataChannel closed');
         webrtcReadyRef.current = false;
       };
 
@@ -554,7 +552,6 @@ export default function LivePage() {
       dc.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log('[WebRTC] Received:', { result: data.result, transport: data.transport, inference_ms: data.inference_ms });
 
           // Process same as WebSocket message
           if (data.result !== undefined && data.primary !== undefined) {
@@ -569,10 +566,12 @@ export default function LivePage() {
               setVetoScore(null);
             }
 
+            // CRITICAL: Pass result to prevent alerts when VETOED
             processDetectionResult({
               violence_score: data.primary / 100,
               t_total: data.inference_ms,
               buffer_size: data.buffer,
+              result: data.result, // Pass VIOLENCE/VETOED/SAFE status
             });
 
             // Handle skeleton display - same logic as WebSocket handler
@@ -607,7 +606,7 @@ export default function LivePage() {
       };
 
       pc.onconnectionstatechange = () => {
-        console.log('[WebRTC] Connection state:', pc.connectionState);
+        // Connection state change tracked internally
       };
 
       // Create and send offer
@@ -619,7 +618,6 @@ export default function LivePage() {
         sdp: offer.sdp,
         sdp_type: offer.type
       }));
-      console.log('[WebRTC] Sent offer to server');
 
     } catch (err) {
       console.error('[WebRTC] Setup failed:', err);
@@ -631,13 +629,11 @@ export default function LivePage() {
   const connectWebSocket = (): Promise<boolean> => {
     return new Promise((resolve) => {
       const wsUrl = process.env.NEXT_PUBLIC_VASTAI_WS_URL || 'wss://api.nexaravision.com:14033/ws/live';
-      console.log('[WS] Connecting to:', wsUrl);
 
       try {
         const ws = new WebSocket(wsUrl);
 
         ws.onopen = () => {
-          console.log('[WS] Connected successfully!');
           setStatus('active');
 
           // Send current config to server on connection
@@ -653,7 +649,6 @@ export default function LivePage() {
             }
           };
           ws.send(JSON.stringify(configMessage));
-          console.log('[WS] Sent initial config:', configMessage.settings);
 
           // Setup WebRTC DataChannel for low-latency transmission
           setTimeout(() => setupWebRTC(), 500);
@@ -667,20 +662,17 @@ export default function LivePage() {
 
             // Handle config_updated confirmation (legacy v39)
             if (data.type === 'config_updated') {
-              console.log('[WS] Config updated on server:', data.config);
               return;
             }
 
             // Handle WebRTC answer from server
             if (data.type === 'webrtc_answer') {
-              console.log('[WebRTC] Received answer from server');
               if (pcRef.current) {
                 const answer = new RTCSessionDescription({
                   type: data.sdp_type,
                   sdp: data.sdp
                 });
                 pcRef.current.setRemoteDescription(answer)
-                  .then(() => console.log('[WebRTC] Remote description set'))
                   .catch(err => console.error('[WebRTC] Failed to set remote description:', err));
               }
               return;
@@ -689,13 +681,6 @@ export default function LivePage() {
             // Handle smart_veto_final format (no type field, has 'result' field)
             if (data.result !== undefined && data.primary !== undefined) {
               // Smart Veto Final format: {primary, veto, result, buffer, inference_ms, stats}
-              console.log('[SmartVeto]', {
-                primary: data.primary,
-                veto: data.veto,
-                result: data.result,
-                inference_ms: data.inference_ms,
-                buffer: data.buffer,
-              });
 
               // Update VETO status based on result
               if (data.result === 'VIOLENCE') {
@@ -710,10 +695,12 @@ export default function LivePage() {
               }
 
               // Convert smart_veto format to v39-compatible format for processDetectionResult
+              // CRITICAL: Pass result to prevent alerts when VETOED
               processDetectionResult({
                 violence_score: data.primary / 100, // Convert 0-100 to 0-1
                 t_total: data.inference_ms,
                 buffer_size: data.buffer,
+                result: data.result, // Pass VIOLENCE/VETOED/SAFE status
               });
 
               // Display processed frame with skeleton (perfect sync - skeleton drawn server-side)
@@ -743,13 +730,6 @@ export default function LivePage() {
 
             // Handle legacy v39 format (has type: 'result')
             if (data.type === 'result') {
-              console.log('[v39 Response]', {
-                violence_score: data.violence_score,
-                t_total: data.t_total,
-                buffer_size: data.buffer_size,
-                num_detected: data.num_detected,
-              });
-
               // Update VETO status from v39 extra field
               if (data.extra?.src) {
                 setVetoStatus(data.extra.src as VetoStatus);
@@ -777,8 +757,7 @@ export default function LivePage() {
               return;
             }
 
-            // Unknown message format
-            console.log('[WS] Unknown message format:', Object.keys(data));
+            // Unknown message format - ignore silently
           } catch (err) {
             console.error('WS message error:', err, event.data?.substring?.(0, 100));
           }
@@ -790,11 +769,9 @@ export default function LivePage() {
           resolve(false);
         };
 
-        ws.onclose = (event) => {
-          console.log('[WS] Closed, code:', event.code, 'reason:', event.reason);
+        ws.onclose = () => {
           // Use ref to avoid stale closure - isActiveRef is always current
           if (isActiveRef.current) {
-            console.log('[WS] Reconnecting in 2s...');
             setTimeout(() => connectWebSocket(), 2000);
           }
         };
@@ -818,19 +795,38 @@ export default function LivePage() {
     // Handle v39 timing: t_total or old format: inference_time
     const latency = data.t_total ?? data.t_gcn ?? data.inference_time ?? 0;
 
-    // Debug: Log actual values received
-    console.log(`[Detection] v=${violence.toFixed(1)}% lat=${latency.toFixed(0)}ms buf=${data.buffer_size || 0} veto=${data.extra?.src || 'N/A'}`);
+    // CRITICAL: Check if this was VETOED - don't count as violent frame or trigger alerts
+    // If result is 'VETOED', the VETO model rejected it as a false positive
+    // Only trigger alerts for confirmed 'VIOLENCE' or when no result field (browser mode)
+    const isVetoed = data.result === 'VETOED';
+    const isConfirmedViolence = data.result === 'VIOLENCE';
+    // For browser mode (no result field), use threshold-based detection
+    const shouldTriggerAlerts = isConfirmedViolence || (data.result === undefined);
 
     // Use configurable threshold for violent frame counting
+    // DON'T count VETOED frames as violent
     setStats((prev) => ({
       ...prev,
       totalFrames: prev.totalFrames + 1,
-      violentFrames: violence > detectionSettings.primary_threshold ? prev.violentFrames + 1 : prev.violentFrames,
+      violentFrames: (!isVetoed && violence > detectionSettings.primary_threshold) ? prev.violentFrames + 1 : prev.violentFrames,
       peakViolence: Math.max(prev.peakViolence, violence),
       avgLatency: prev.avgLatency === 0 ? latency : (prev.avgLatency + latency) / 2,
     }));
 
+    // CRITICAL: Skip fight detection entirely if VETOED
+    if (isVetoed) {
+      // Reset violence counters when vetoed - this was a false positive
+      violenceHitsRef.current = Math.max(0, violenceHitsRef.current - 1);
+      sustainedViolenceRef.current = Math.max(0, sustainedViolenceRef.current - 10);
+      return; // Don't trigger any alerts
+    }
+
     // Fight detection using configurable thresholds
+    // Only run if shouldTriggerAlerts (confirmed VIOLENCE or browser mode)
+    if (!shouldTriggerAlerts) {
+      return;
+    }
+
     // Instant trigger: N× frames at X%+
     if (violence >= detectionSettings.instant_trigger_threshold) {
       violenceHitsRef.current++;
@@ -870,11 +866,8 @@ export default function LivePage() {
     let camera = activeCameraRef.current;
     let location = defaultLocationRef.current;
 
-    console.log('[Incident] Check - shouldCreate:', shouldCreateNewIncident, 'camera:', camera?.id, 'location:', location?.id);
-
     // If camera or location is missing, try to create them now (fallback)
     if (shouldCreateNewIncident && (!camera?.id || !location?.id)) {
-      console.warn('[Incident] Missing camera/location, attempting to create...');
 
       // Try to create location if missing
       if (!location?.id) {
@@ -884,7 +877,6 @@ export default function LivePage() {
             location = newLoc;
             defaultLocationRef.current = newLoc;
             setDefaultLocation(newLoc);
-            console.log('[Incident] Fallback location created:', newLoc.id);
           } else {
             console.error('[Incident] Fallback location failed:', locErr);
           }
@@ -901,7 +893,6 @@ export default function LivePage() {
             camera = newCam;
             activeCameraRef.current = newCam;
             setActiveCamera(newCam);
-            console.log('[Incident] Fallback camera created:', newCam.id);
           } else {
             console.error('[Incident] Fallback camera failed:', camErr);
           }
@@ -920,8 +911,6 @@ export default function LivePage() {
         thumbnailBlob = await captureVideoFrame(videoRef.current);
       }
 
-      console.log('[Incident] Creating incident immediately, confidence:', confidence);
-
       // Create incident right away (video will be added later if recording)
       const { incident, error } = await createIncidentWithRecording({
         camera_id: camera.id,
@@ -933,7 +922,6 @@ export default function LivePage() {
       });
 
       if (incident) {
-        console.log('[Incident] ✅ Created successfully:', incident.id);
         currentIncidentIdRef.current = incident.id;
         setDbError(null); // Clear any previous error
       } else if (error) {
@@ -962,14 +950,19 @@ export default function LivePage() {
       }]);
     }
 
-    // Start recording if not already, and reset the 1-minute timer
+    // Start recording if not already (ONLY ONCE per incident - don't reset timer)
     if (detectionSettings.auto_record && streamRef.current) {
-      // Start recording if not already recording
+      // Only start recording if not already recording
+      // DON'T reset the timer - record once and finalize after 1 minute
       if (!mediaRecorderRef.current) {
         startIncidentRecording();
+        // Start the finalization timer ONLY when starting new recording
+        triggerRecordingReset(confidence);
       }
-      // Reset the 1-minute timer (each trigger extends the recording window)
-      triggerRecordingReset(confidence);
+      // Track peak confidence during recording (but don't reset timer)
+      if (confidence > incidentStartConfidenceRef.current) {
+        incidentStartConfidenceRef.current = confidence;
+      }
     }
 
     if (fightAlertTimeoutRef.current) {
@@ -1001,8 +994,8 @@ export default function LivePage() {
 
         oscillator.start(audioContext.currentTime);
         oscillator.stop(audioContext.currentTime + 0.3);
-      } catch (err) {
-        console.warn('[Alert] Sound playback failed:', err);
+      } catch {
+        // Sound playback failed silently
       }
     }
   };
@@ -1075,19 +1068,13 @@ export default function LivePage() {
     } else if (detectionMode === 'server') {
       // Check WebSocket status
       if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-        // Throttle warning log to once per second (prevents console spam)
-        const now = Date.now();
-        if (now - lastWsWarningRef.current > 1000) {
-          console.warn('[WS] Waiting for connection, state:', wsRef.current?.readyState);
-          lastWsWarningRef.current = now;
-        }
+        // WS not ready - wait for reconnection
         animationRef.current = requestAnimationFrame(runDetectionLoop);
         return;
       }
 
       // Skip if WebSocket buffer is too full (GAP-008 fix - prevent backlog)
       if (wsRef.current.bufferedAmount > 256 * 1024) {  // 256KB threshold (reduced for faster response)
-        console.warn('[WS] Buffer full, skipping frame');
         animationRef.current = requestAnimationFrame(runDetectionLoop);
         return;
       }
@@ -1106,8 +1093,8 @@ export default function LivePage() {
             const arrayBuffer = await blob.arrayBuffer();
             dcRef.current.send(arrayBuffer);
             // console.log('[WebRTC] Frame sent via DataChannel');
-          } catch (err) {
-            console.warn('[WebRTC] DataChannel send failed, falling back to WebSocket');
+          } catch {
+            // DataChannel send failed - falling back to WebSocket
             webrtcReadyRef.current = false;
           }
         } else if (wsRef.current?.readyState === WebSocket.OPEN) {
@@ -1212,7 +1199,7 @@ export default function LivePage() {
     const overlay = overlayCanvasRef.current;
     const video = videoRef.current;
     if (!overlay || !video) {
-      console.warn('[Skeleton] Missing overlay or video');
+      return; // Missing overlay or video
       return;
     }
 
@@ -1257,7 +1244,7 @@ export default function LivePage() {
     const scaleX = displayWidth / sentWidth;
     const scaleY = displayHeight / sentHeight;
 
-    console.log(`[Skeleton] sent: ${sentWidth}x${sentHeight}, display: ${displayWidth}x${displayHeight}, scale: ${scaleX.toFixed(2)}x${scaleY.toFixed(2)}`);
+    // Skeleton scaling: sent ${sentWidth}x${sentHeight} -> display ${displayWidth}x${displayHeight}
 
     skeletons.forEach((skeleton, poseIndex) => {
       if (!skeleton || skeleton.length < 17) {
@@ -1267,11 +1254,10 @@ export default function LivePage() {
       const color = colors[poseIndex % colors.length];
       const isViolent = currentViolence > 50;
 
-      // Draw connections
+      // Draw connections (no shadow - was causing "double skeleton" appearance)
       ctx.strokeStyle = isViolent ? '#ef4444' : color;
-      ctx.lineWidth = 3;
-      ctx.shadowColor = isViolent ? '#ef4444' : color;
-      ctx.shadowBlur = 8;
+      ctx.lineWidth = 2;
+      ctx.shadowBlur = 0;  // Disable shadow
 
       connections.forEach(([i, j]) => {
         const kp1 = skeleton[i];
@@ -1374,7 +1360,6 @@ export default function LivePage() {
       mediaRecorderRef.current = recorder;
       recordingStartTimeRef.current = Date.now();
       setIsRecording(true);
-      console.log('[Recording] Started incident recording (1 minute window)');
 
       // Start countdown display
       setRecordingTimeLeft(RECORDING_DURATION);
@@ -1391,7 +1376,6 @@ export default function LivePage() {
     // Clear existing timeout
     if (recordingTimeoutRef.current) {
       clearTimeout(recordingTimeoutRef.current);
-      console.log('[Recording] Timer reset - violence re-triggered');
     }
 
     // Track the highest confidence during this incident
@@ -1404,7 +1388,6 @@ export default function LivePage() {
 
     // Set new timeout to save after 1 minute of no new violence
     recordingTimeoutRef.current = setTimeout(() => {
-      console.log('[Recording] 1 minute elapsed without new violence - saving');
       finalizeIncidentRecording();
     }, RECORDING_DURATION * 1000);
   }, []);
@@ -1438,27 +1421,15 @@ export default function LivePage() {
     currentIncidentIdRef.current = null;
 
     if (allChunks.length === 0) {
-      console.log('[Recording] No video chunks to save');
       return;
     }
 
     const videoBlob = new Blob(allChunks, { type: 'video/webm' });
-    const durationSecs = Math.round((Date.now() - recordingStartTimeRef.current) / 1000);
-    console.log(`[Recording] Recording finished, video size: ${videoBlob.size} bytes, duration: ${durationSecs}s`);
 
     // Upload video to storage and update the incident record
     if (incidentId && videoBlob.size > 0) {
-      console.log('[Recording] Uploading video for incident:', incidentId);
       // Don't await - let upload happen in background
-      uploadIncidentVideo(incidentId, videoBlob).then(url => {
-        if (url) {
-          console.log('[Recording] Video uploaded successfully:', url);
-        } else {
-          console.warn('[Recording] Video upload failed');
-        }
-      });
-    } else {
-      console.warn('[Recording] No incident ID to attach video to');
+      uploadIncidentVideo(incidentId, videoBlob);
     }
   }, []);
 
@@ -1482,7 +1453,6 @@ export default function LivePage() {
     recordedChunksRef.current = [];
     incidentStartConfidenceRef.current = 0;
     setIsRecording(false);
-    console.log('[Recording] Stopped and cleared');
   }, []);
 
   // Start detection
@@ -1500,12 +1470,10 @@ export default function LivePage() {
     startTimeRef.current = Date.now();
 
     // Get or create default location first
-    console.log('[Live] Getting/creating default location...');
     const { location, error: locationError } = await getOrCreateDefaultLocation();
     if (location) {
       setDefaultLocation(location);
       defaultLocationRef.current = location; // Set ref immediately for WebSocket callback
-      console.log('[Live] Location ready:', location.id, location.name);
       setDbError(null); // Clear any previous error
     } else {
       console.error('[Live] Failed to get/create location:', locationError);
@@ -1528,7 +1496,6 @@ export default function LivePage() {
     }
 
     // Try to register camera in Supabase
-    console.log('[Live] Registering camera, type:', cameraSourceType);
     try {
       const { camera, error: cameraError } = await findOrCreateCamera(
         cameraSourceType,
@@ -1539,7 +1506,6 @@ export default function LivePage() {
       if (camera) {
         setActiveCamera(camera);
         activeCameraRef.current = camera; // Set ref immediately for WebSocket callback
-        console.log('[Live] Camera registered:', camera.name, camera.id);
       } else {
         console.error('[Live] Camera registration failed:', cameraError);
       }
@@ -1592,7 +1558,6 @@ export default function LivePage() {
     // Set camera offline
     if (activeCamera?.id) {
       await setCameraStatus(activeCamera.id, 'offline');
-      console.log('[Live] Camera set offline:', activeCamera.name);
     }
 
     if (streamRef.current) {
@@ -1679,7 +1644,6 @@ export default function LivePage() {
         setStatus('paused');
         // Preserve current violence reading
         lastViolenceRef.current = currentViolence;
-        console.log('[Video] Paused - preserving violence:', currentViolence);
       }
     };
 
@@ -1690,12 +1654,10 @@ export default function LivePage() {
         if (lastViolenceRef.current > 0 && currentViolence === 0) {
           setCurrentViolence(lastViolenceRef.current);
         }
-        console.log('[Video] Playing');
       }
     };
 
     const handleEnded = () => {
-      console.log('[Video] Ended');
       if (uploadedFile) {
         setStatus('paused');
         // Keep violence meter at last value
