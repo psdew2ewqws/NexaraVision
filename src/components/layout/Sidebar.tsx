@@ -125,7 +125,7 @@ export function Sidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const { locale, setLocale, isRTL } = useLanguage();
-  const { signOut, profile, isAdmin } = useAuth();
+  const { signOut, profile, isAdmin, loading: authLoading, user } = useAuth();
 
   // Handle logout with redirect - use full page reload to properly clear session
   const handleLogout = async () => {
@@ -298,25 +298,43 @@ export function Sidebar() {
 
         {/* Footer */}
         <div className="p-2 border-t border-white/[0.06] space-y-0.5">
-          {/* User */}
-          {profile && (
+          {/* User - show loading state or fallback to user email */}
+          {(profile || user || authLoading) && (
             <div className={cn(
               "flex items-center gap-2.5 p-2 rounded-lg mb-1",
               collapsed && "justify-center",
               isRTL && !collapsed && "flex-row-reverse"
             )}>
-              <div className="w-7 h-7 rounded-md bg-slate-800 flex items-center justify-center text-white text-xs font-medium shrink-0">
-                {profile.full_name?.[0]?.toUpperCase() || profile.email[0].toUpperCase()}
-              </div>
-              {!collapsed && (
-                <div className={cn("flex-1 min-w-0", isRTL && "text-right")}>
-                  <p className="text-[13px] text-white truncate">
-                    {profile.full_name || profile.email.split('@')[0]}
-                  </p>
-                  <p className={cn("text-[11px]", roleConfig[userRole].color)}>
-                    {roleConfig[userRole].label[locale as 'en' | 'ar'] || roleConfig[userRole].label.en}
-                  </p>
-                </div>
+              {authLoading && !profile ? (
+                // Loading skeleton
+                <>
+                  <div className="w-7 h-7 rounded-md bg-slate-700 animate-pulse shrink-0" />
+                  {!collapsed && (
+                    <div className="flex-1 min-w-0 space-y-1">
+                      <div className="h-4 bg-slate-700 rounded animate-pulse w-24" />
+                      <div className="h-3 bg-slate-700 rounded animate-pulse w-16" />
+                    </div>
+                  )}
+                </>
+              ) : (
+                // Actual user info - use profile or fallback to user email
+                <>
+                  <div className="w-7 h-7 rounded-md bg-slate-800 flex items-center justify-center text-white text-xs font-medium shrink-0">
+                    {profile?.full_name?.[0]?.toUpperCase() ||
+                     profile?.email?.[0]?.toUpperCase() ||
+                     user?.email?.[0]?.toUpperCase() || '?'}
+                  </div>
+                  {!collapsed && (
+                    <div className={cn("flex-1 min-w-0", isRTL && "text-right")}>
+                      <p className="text-[13px] text-white truncate">
+                        {profile?.full_name || profile?.email?.split('@')[0] || user?.email?.split('@')[0] || 'Loading...'}
+                      </p>
+                      <p className={cn("text-[11px]", roleConfig[userRole].color)}>
+                        {roleConfig[userRole].label[locale as 'en' | 'ar'] || roleConfig[userRole].label.en}
+                      </p>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

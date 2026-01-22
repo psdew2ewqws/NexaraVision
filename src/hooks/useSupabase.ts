@@ -22,25 +22,83 @@ export function useAuthUserId() {
 
   useEffect(() => {
     const supabaseClient = getSupabase();
+    let isMounted = true;
+    let retryCount = 0;
+    const maxRetries = 3;
+    const retryDelay = 500;
 
-    // Get initial session
+    // Get initial session with retry logic for mobile
     const getInitialSession = async () => {
-      const { data: { user } } = await supabaseClient.auth.getUser();
-      setUserId(user?.id ?? null);
-      setIsLoading(false);
+      try {
+        // Try getSession first (more reliable than getUser on some browsers)
+        const { data: { session }, error: sessionError } = await supabaseClient.auth.getSession();
+
+        if (sessionError) {
+          console.warn('[useAuthUserId] getSession error:', sessionError.message);
+        }
+
+        if (session?.user?.id) {
+          console.log('[useAuthUserId] Session found:', session.user.email);
+          if (isMounted) {
+            setUserId(session.user.id);
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        // Fallback to getUser if getSession didn't work
+        const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
+
+        if (userError) {
+          console.warn('[useAuthUserId] getUser error:', userError.message);
+        }
+
+        if (user?.id) {
+          console.log('[useAuthUserId] User found via getUser:', user.email);
+          if (isMounted) {
+            setUserId(user.id);
+            setIsLoading(false);
+          }
+          return;
+        }
+
+        // No session found - retry on mobile (cookies may take time to load)
+        if (retryCount < maxRetries && !session && !user) {
+          retryCount++;
+          console.log(`[useAuthUserId] No session, retrying (${retryCount}/${maxRetries})...`);
+          setTimeout(getInitialSession, retryDelay * retryCount);
+          return;
+        }
+
+        console.log('[useAuthUserId] No session after retries');
+        if (isMounted) {
+          setUserId(null);
+          setIsLoading(false);
+        }
+      } catch (err) {
+        console.error('[useAuthUserId] Exception:', err);
+        if (isMounted) {
+          setUserId(null);
+          setIsLoading(false);
+        }
+      }
     };
 
     getInitialSession();
 
     // Listen for auth state changes
     const { data: { subscription } } = supabaseClient.auth.onAuthStateChange(
-      (_event, session) => {
-        setUserId(session?.user?.id ?? null);
-        setIsLoading(false);
+      (event, session) => {
+        console.log('[useAuthUserId] Auth state changed:', event, session?.user?.email);
+        if (isMounted) {
+          setUserId(session?.user?.id ?? null);
+          setIsLoading(false);
+        }
       }
     );
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, []);

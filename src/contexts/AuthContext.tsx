@@ -41,19 +41,57 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const supabase = getSupabase();
 
-  // Fetch user profile
-  const fetchProfile = useCallback(async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
+  // Fetch user profile with retry logic
+  const fetchProfile = useCallback(async (userId: string, retryCount = 0): Promise<Profile | null> => {
+    const maxRetries = 3;
+    const retryDelay = 1000; // 1 second
 
-    if (!error && data) {
-      setProfile(data as Profile);
-      return data as Profile;
+    try {
+      log.debug(`Fetching profile for user ${userId} (attempt ${retryCount + 1})`);
+
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+
+      if (error) {
+        log.error('Profile fetch error:', error.message, error.code);
+
+        // Retry on network errors or temporary failures
+        if (retryCount < maxRetries && (error.code === 'PGRST301' || error.message.includes('fetch'))) {
+          log.debug(`Retrying profile fetch in ${retryDelay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return fetchProfile(userId, retryCount + 1);
+        }
+
+        // If profile doesn't exist, it might need to be created
+        if (error.code === 'PGRST116') {
+          log.debug('Profile not found, may need to be created');
+        }
+
+        return null;
+      }
+
+      if (data) {
+        log.debug('Profile loaded successfully:', data.email);
+        setProfile(data as Profile);
+        return data as Profile;
+      }
+
+      return null;
+    } catch (err) {
+      log.error('Profile fetch exception:', err);
+
+      // Retry on exceptions
+      if (retryCount < maxRetries) {
+        log.debug(`Retrying after exception in ${retryDelay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        return fetchProfile(userId, retryCount + 1);
+      }
+
+      return null;
     }
-    return null;
   }, [supabase]);
 
   // Refresh profile (can be called externally)
@@ -122,16 +160,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Initial session and auth state listener
   useEffect(() => {
+    let isMounted = true;
+
     const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
+      try {
+        log.debug('Getting initial session...');
+        const { data: { session }, error } = await supabase.auth.getSession();
 
-      if (session?.user) {
-        await fetchProfile(session.user.id);
+        if (error) {
+          log.error('Error getting session:', error.message);
+        }
+
+        if (!isMounted) return;
+
+        log.debug('Session retrieved:', session ? 'valid' : 'none');
+        setSession(session);
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          log.debug('User found, fetching profile for:', session.user.email);
+          const profile = await fetchProfile(session.user.id);
+          if (!profile && isMounted) {
+            log.warn('Profile not loaded for user:', session.user.email);
+          }
+        }
+
+        if (isMounted) {
+          setLoading(false);
+        }
+      } catch (err) {
+        log.error('Exception in getInitialSession:', err);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
-
-      setLoading(false);
     };
 
     getInitialSession();
@@ -139,7 +201,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        log.debug('Auth state changed:', event);
+        if (!isMounted) return;
+
+        log.debug('Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user ?? null);
 
@@ -154,6 +218,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     );
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, [supabase, fetchProfile]);
