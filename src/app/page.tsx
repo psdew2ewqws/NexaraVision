@@ -118,10 +118,10 @@ export default function Dashboard() {
   const lastViolence = incidents.find(i => i.status === 'detected' || i.status === 'acknowledged');
   const lastViolenceTime = lastViolence ? new Date(lastViolence.detected_at) : null;
 
-  // Format relative time
+  // Format relative time (using currentTime state to avoid impure Date.now() during render)
   const formatRelativeTime = (date: Date | null) => {
-    if (!date) return locale === 'ar' ? 'لا توجد حوادث' : 'No incidents';
-    const diff = Date.now() - date.getTime();
+    if (!date || !currentTime) return locale === 'ar' ? 'لا توجد حوادث' : 'No incidents';
+    const diff = currentTime.getTime() - date.getTime();
     const mins = Math.floor(diff / 60000);
     const hours = Math.floor(mins / 60);
     const days = Math.floor(hours / 24);
