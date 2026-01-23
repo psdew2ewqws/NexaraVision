@@ -396,7 +396,11 @@ export default function UsersPage() {
                   {icon}
                 </div>
                 <div>
-                  <div className="text-2xl font-semibold text-white">{value}</div>
+                  <div className="text-2xl font-semibold text-white">
+                    {loading ? (
+                      <div className="h-8 w-8 bg-slate-700/50 rounded animate-pulse" />
+                    ) : value}
+                  </div>
                   <div className="text-sm text-slate-400">{t.stats[key as keyof typeof t.stats]}</div>
                 </div>
               </div>
