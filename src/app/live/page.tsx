@@ -376,10 +376,11 @@ export default function LivePage() {
   const activeCameraRef = useRef<CameraRecord | null>(null);
   const defaultLocationRef = useRef<Location | null>(null);
 
-  // Refs for alertSettings, user, and modelConfig to avoid stale closures in WebSocket callbacks
+  // Refs for alertSettings, user, modelConfig, and detectionSettings to avoid stale closures in WebSocket callbacks
   const alertSettingsRef = useRef(alertSettings);
   const userRef = useRef(user);
   const modelConfigRef = useRef(modelConfig);
+  const detectionSettingsRef = useRef(detectionSettings);
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -926,10 +927,12 @@ export default function LivePage() {
 
     // Use configurable threshold for violent frame counting
     // DON'T count VETOED frames as violent
+    // CRITICAL: Use ref to avoid stale closure when called from WebSocket callback
+    const currentSettings = detectionSettingsRef.current;
     setStats((prev) => ({
       ...prev,
       totalFrames: prev.totalFrames + 1,
-      violentFrames: (!isVetoed && violence > detectionSettings.primary_threshold) ? prev.violentFrames + 1 : prev.violentFrames,
+      violentFrames: (!isVetoed && violence > currentSettings.primary_threshold) ? prev.violentFrames + 1 : prev.violentFrames,
       peakViolence: Math.max(prev.peakViolence, violence),
       avgLatency: prev.avgLatency === 0 ? latency : (prev.avgLatency + latency) / 2,
     }));
@@ -959,9 +962,9 @@ export default function LivePage() {
     // Note: VETOED frames are already filtered above (line 938-942)
 
     // Instant trigger: N× frames at X%+
-    if (violence >= detectionSettings.instant_trigger_threshold) {
+    if (violence >= currentSettings.instant_trigger_threshold) {
       violenceHitsRef.current++;
-      if (violenceHitsRef.current >= detectionSettings.instant_trigger_count) {
+      if (violenceHitsRef.current >= currentSettings.instant_trigger_count) {
         triggerFightAlert(violence);
         violenceHitsRef.current = 0; // Reset after triggering
       }
@@ -971,8 +974,8 @@ export default function LivePage() {
 
     // Sustained trigger: X seconds at Y%+
     // Assuming ~30fps, sustained_duration seconds = sustained_duration * 30 frames
-    const sustainedFrameCount = detectionSettings.sustained_duration * 30;
-    if (violence >= detectionSettings.sustained_threshold) {
+    const sustainedFrameCount = currentSettings.sustained_duration * 30;
+    if (violence >= currentSettings.sustained_threshold) {
       sustainedViolenceRef.current++;
       if (sustainedViolenceRef.current >= sustainedFrameCount) {
         triggerFightAlert(violence);
@@ -1124,7 +1127,9 @@ export default function LivePage() {
     }
 
     // Start recording ONCE per incident (no timer reset on re-trigger)
-    if (detectionSettings.auto_record && streamRef.current && !mediaRecorderRef.current) {
+    // CRITICAL: Use ref to avoid stale closure when called from WebSocket callback
+    const alertSettings = detectionSettingsRef.current;
+    if (alertSettings.auto_record && streamRef.current && !mediaRecorderRef.current) {
       startIncidentRecording();
       startRecordingTimer(confidence);
     }
@@ -1140,7 +1145,7 @@ export default function LivePage() {
     }, 3000);
 
     // Play alert sound
-    if (!isMuted && detectionSettings.sound_enabled) {
+    if (!isMuted && alertSettings.sound_enabled) {
       try {
         // Use Web Audio API for more reliable playback (webkitAudioContext for Safari)
          
@@ -1957,6 +1962,11 @@ export default function LivePage() {
   useEffect(() => {
     modelConfigRef.current = modelConfig;
   }, [modelConfig]);
+
+  // Sync detectionSettingsRef to avoid stale closures in WebSocket callbacks
+  useEffect(() => {
+    detectionSettingsRef.current = detectionSettings;
+  }, [detectionSettings]);
 
   // Sync isActiveRef with isActive state (prevents stale closure in WS onclose)
   useEffect(() => {
