@@ -18,15 +18,7 @@ import {
   SummaryBox,
 } from '@/components/ui/toolbar-expandable';
 import { SmartVetoConfig } from '@/components/settings/SmartVetoConfig';
-import {
-  FloatingPanelRoot,
-  FloatingPanelTrigger,
-  FloatingPanelContent,
-  FloatingPanelHeader,
-  FloatingPanelBody,
-  FloatingPanelFooter,
-  FloatingPanelCloseButton,
-} from '@/components/ui/floating-panel';
+import { SmartVetoHelp } from '@/components/settings/SmartVetoHelp';
 
 // Re-export for backward compatibility
 export { DEFAULT_DETECTION_SETTINGS };
@@ -93,11 +85,6 @@ const Icons = {
   cloud: (
     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15a4.5 4.5 0 004.5 4.5H18a3.75 3.75 0 001.332-7.257 3 3 0 00-3.758-3.848 5.25 5.25 0 00-10.233 2.33A4.502 4.502 0 002.25 15z" />
-    </svg>
-  ),
-  info: (
-    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-      <path strokeLinecap="round" strokeLinejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z" />
     </svg>
   ),
   whatsapp: (
@@ -420,21 +407,8 @@ export default function SettingsPage() {
             <p className="text-zinc-500 text-xs sm:text-sm mt-1">{t.subtitle}</p>
           </div>
 
-          {/* Help button */}
-          <FloatingPanelRoot>
-            <FloatingPanelTrigger className="rounded-lg">
-              {Icons.info}
-            </FloatingPanelTrigger>
-            <FloatingPanelContent className="w-96">
-              <FloatingPanelHeader>{t.helpTitle}</FloatingPanelHeader>
-              <FloatingPanelBody>
-                <p className="text-sm text-zinc-400">{t.helpContent}</p>
-              </FloatingPanelBody>
-              <FloatingPanelFooter>
-                <FloatingPanelCloseButton>Close</FloatingPanelCloseButton>
-              </FloatingPanelFooter>
-            </FloatingPanelContent>
-          </FloatingPanelRoot>
+          {/* Smart Veto Help */}
+          <SmartVetoHelp locale={locale as 'en' | 'ar'} isRTL={isRTL} />
         </div>
 
         {/* Sync Status */}
