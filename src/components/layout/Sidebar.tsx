@@ -304,46 +304,44 @@ export function Sidebar() {
 
         {/* Footer */}
         <div className="p-2 border-t border-white/[0.06] space-y-0.5">
-          {/* User - show loading state or fallback to user email */}
-          {(profile || user || authLoading) && (
-            <div className={cn(
-              "flex items-center gap-2.5 p-2 rounded-lg mb-1",
-              collapsed && "justify-center",
-              isRTL && !collapsed && "flex-row-reverse"
-            )}>
-              {authLoading && !profile ? (
-                // Loading skeleton
-                <>
-                  <div className="w-7 h-7 rounded-md bg-slate-700 animate-pulse shrink-0" />
-                  {!collapsed && (
-                    <div className="flex-1 min-w-0 space-y-1">
-                      <div className="h-4 bg-slate-700 rounded animate-pulse w-24" />
-                      <div className="h-3 bg-slate-700 rounded animate-pulse w-16" />
-                    </div>
-                  )}
-                </>
-              ) : (
-                // Actual user info - use profile or fallback to user email
-                <>
-                  <div className="w-7 h-7 rounded-md bg-slate-800 flex items-center justify-center text-white text-xs font-medium shrink-0">
-                    {profile?.full_name?.[0]?.toUpperCase() ||
-                     profile?.email?.[0]?.toUpperCase() ||
-                     user?.email?.[0]?.toUpperCase() || '?'}
+          {/* User - ALWAYS show this section with loading state until auth resolves */}
+          <div className={cn(
+            "flex items-center gap-2.5 p-2 rounded-lg mb-1",
+            collapsed && "justify-center",
+            isRTL && !collapsed && "flex-row-reverse"
+          )}>
+            {(authLoading || (!profile && !user)) ? (
+              // Loading skeleton - show while loading OR while waiting for profile/user
+              <>
+                <div className="w-7 h-7 rounded-md bg-slate-700 animate-pulse shrink-0" />
+                {!collapsed && (
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <div className="h-4 bg-slate-700 rounded animate-pulse w-24" />
+                    <div className="h-3 bg-slate-700 rounded animate-pulse w-16" />
                   </div>
-                  {!collapsed && (
-                    <div className={cn("flex-1 min-w-0", isRTL && "text-right")}>
-                      <p className="text-[13px] text-white truncate">
-                        {profile?.full_name || profile?.email?.split('@')[0] || user?.email?.split('@')[0] || 'Loading...'}
-                      </p>
-                      <p className={cn("text-[11px]", roleConfig[userRole].color)}>
-                        {roleConfig[userRole].label[locale as 'en' | 'ar'] || roleConfig[userRole].label.en}
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          )}
+                )}
+              </>
+            ) : (
+              // Actual user info - use profile or fallback to user email
+              <>
+                <div className="w-7 h-7 rounded-md bg-slate-800 flex items-center justify-center text-white text-xs font-medium shrink-0">
+                  {profile?.full_name?.[0]?.toUpperCase() ||
+                   profile?.email?.[0]?.toUpperCase() ||
+                   user?.email?.[0]?.toUpperCase() || '?'}
+                </div>
+                {!collapsed && (
+                  <div className={cn("flex-1 min-w-0", isRTL && "text-right")}>
+                    <p className="text-[13px] text-white truncate">
+                      {profile?.full_name || profile?.email?.split('@')[0] || user?.email?.split('@')[0] || 'User'}
+                    </p>
+                    <p className={cn("text-[11px]", roleConfig[userRole].color)}>
+                      {roleConfig[userRole].label[locale as 'en' | 'ar'] || roleConfig[userRole].label.en}
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
 
           {/* Language - Touch optimized */}
           <button
