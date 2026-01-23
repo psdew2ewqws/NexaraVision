@@ -83,7 +83,9 @@ function LoginForm() {
         : 'Please confirm your email address before logging in. Check your inbox for the confirmation link.');
       setLoading(false);
     } else {
-      router.push(redirect);
+      // Use full page reload instead of soft navigation to ensure auth state refreshes
+      // This fixes the issue where user appears not logged in after login
+      window.location.href = redirect;
     }
   };
 
