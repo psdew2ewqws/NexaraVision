@@ -129,9 +129,15 @@ export function Sidebar() {
 
   // Handle logout with redirect - use full page reload to properly clear session
   const handleLogout = async () => {
-    await signOut();
-    // Use window.location for full page reload to ensure middleware runs fresh
-    window.location.href = '/login';
+    try {
+      await signOut();
+    } catch (error) {
+      console.error('Logout error:', error);
+    } finally {
+      // Always redirect to login, even if signOut fails
+      // Use window.location for full page reload to ensure auth state clears
+      window.location.href = '/login';
+    }
   };
 
   useEffect(() => {
