@@ -954,16 +954,16 @@ export default function LivePage() {
       return;
     }
 
-    // BROWSER MODE ONLY (no server result) - use threshold-based detection
-    if (data.result !== undefined) {
-      return; // Server sent SAFE, don't trigger
-    }
+    // CLIENT-SIDE THRESHOLD TRIGGERS (works in both browser and server mode)
+    // These respect user's lower thresholds even when server says SAFE
+    // Note: VETOED frames are already filtered above (line 938-942)
 
     // Instant trigger: N× frames at X%+
     if (violence >= detectionSettings.instant_trigger_threshold) {
       violenceHitsRef.current++;
       if (violenceHitsRef.current >= detectionSettings.instant_trigger_count) {
         triggerFightAlert(violence);
+        violenceHitsRef.current = 0; // Reset after triggering
       }
     } else {
       violenceHitsRef.current = Math.max(0, violenceHitsRef.current - 1);
@@ -976,6 +976,7 @@ export default function LivePage() {
       sustainedViolenceRef.current++;
       if (sustainedViolenceRef.current >= sustainedFrameCount) {
         triggerFightAlert(violence);
+        sustainedViolenceRef.current = 0; // Reset after triggering
       }
     } else {
       sustainedViolenceRef.current = Math.max(0, sustainedViolenceRef.current - 10);
