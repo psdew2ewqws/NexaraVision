@@ -19,7 +19,7 @@
 | **Manuscript submitted:** | January 2026 |
 | **Paper type:** | Original Research Article |
 | **Word count:** | ~5,000 words |
-| **Figures:** | 3 |
+| **Figures:** | 4 |
 | **Tables:** | 15 |
 | **References:** | 14 |
 
@@ -175,48 +175,9 @@ In practice, we achieve **0.1%** due to the models' complementary error patterns
 
 #### 3.2.2 Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    INPUT: Video Frame                        │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│              YOLOv26 Pose Estimation + BoT-SORT             │
-│                    (17 COCO Keypoints)                       │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                One Euro Filter Smoothing                     │
-│              (Speed-Adaptive Jitter Reduction)               │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│              Per-Track Temporal Buffer (32 frames)           │
-└─────────────────────────────────────────────────────────────┘
-                              │
-              ┌───────────────┴───────────────┐
-              ▼                               ▼
-┌─────────────────────────┐     ┌─────────────────────────┐
-│     PRIMARY MODEL       │     │      VETO MODEL         │
-│      ST-GCN++           │     │        MS-G3D           │
-│   (94.56% accuracy)     │     │    (95.17% accuracy)    │
-│   Threshold: 94%        │     │    Threshold: 85%       │
-└─────────────────────────┘     └─────────────────────────┘
-              │                               │
-              └───────────────┬───────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   SMART VETO LOGIC                           │
-│                                                              │
-│   VIOLENCE = (PRIMARY ≥ 94%) AND (VETO ≥ 85%)               │
-│   VETOED   = (PRIMARY ≥ 94%) AND (VETO < 85%)               │
-│   SAFE     = (PRIMARY < 94%)                                 │
-└─────────────────────────────────────────────────────────────┘
-```
+![Figure 1: Smart Veto Ensemble Architecture](images/fig1_smart_veto_architecture.png)
+
+*Figure 1: Smart Veto Ensemble Architecture. Video frames are processed through YOLOv26 pose estimation with BoT-SORT tracking, followed by One Euro Filter smoothing. The temporal buffer feeds both the PRIMARY (ST-GCN++) and VETO (MS-G3D) models, with the Smart Veto logic making the final decision based on asymmetric thresholds.*
 
 #### 3.2.3 Decision Logic
 
@@ -409,61 +370,15 @@ CREATE TABLE user_model_configurations (
 
 ### 4.2 Software Stack
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     Frontend (Next.js)                       │
-│          React + TypeScript + Tailwind CSS                   │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                    WebSocket (WSS)
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                    nginx (SSL Proxy)                         │
-│                    Port 8080 → 6006                          │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│              Python Backend (FastAPI + Uvicorn)              │
-│                        Port 6006                             │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │  YOLOv26-Pose │ ST-GCN++ │ MS-G3D │ BoT-SORT       │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-                              │
-┌─────────────────────────────────────────────────────────────┐
-│                   Supabase (PostgreSQL)                      │
-│    User Auth │ Configurations │ Incidents │ Real-time       │
-└─────────────────────────────────────────────────────────────┘
-```
+![Figure 2: NexaraVision Software Stack](images/fig2_software_stack.png)
+
+*Figure 2: NexaraVision Software Stack Architecture. The frontend (Next.js 15) communicates via WebSocket through nginx SSL proxy to the Python backend running FastAPI. The backend integrates YOLOv26-Pose, ST-GCN++, MS-G3D, and BoT-SORT for real-time processing, with Supabase providing authentication and data persistence.*
 
 ### 4.3 Real-Time Processing Pipeline
 
-```
-Frame Acquisition (WebSocket)
-       │
-       ▼ (< 5ms)
-JPEG Decoding
-       │
-       ▼ (< 10ms)
-YOLOv26 Pose Estimation + BoT-SORT
-       │
-       ▼ (< 1ms)
-One Euro Filter Smoothing
-       │
-       ▼ (< 1ms)
-Per-Track Buffer Update
-       │
-       ▼ (< 25ms) [every 8 frames]
-Dual-Model Inference (FP16)
-       │
-       ▼ (< 1ms)
-Smart Veto Decision
-       │
-       ▼ (< 5ms)
-WebSocket Response
-       │
-Total: < 50ms per frame (< 100ms end-to-end)
-```
+![Figure 3: Real-Time Processing Pipeline](images/fig3_processing_pipeline.png)
+
+*Figure 3: Real-Time Processing Pipeline with latency breakdown. Each stage is optimized for minimal latency, achieving a total of less than 50ms per frame and sub-100ms end-to-end latency including network transmission.*
 
 ### 4.4 Latency Breakdown
 
@@ -941,35 +856,9 @@ Configuration files and training scripts are provided in Appendix C.
 
 ## Graphical Abstract
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                         NEXARAVISION OVERVIEW                            │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                          │
-│   📹 Video Input    →    🦴 Skeleton     →    🧠 Dual-Model    →   ✓/✗   │
-│   (30 FPS)              Extraction           Smart Veto         Alert   │
-│                         (YOLOv26)            (ST-GCN++ +                 │
-│                                               MS-G3D)                    │
-│                                                                          │
-├─────────────────────────────────────────────────────────────────────────┤
-│                           KEY METRICS                                    │
-│                                                                          │
-│   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌────────────┐  │
-│   │   97.4%      │  │    0.1%      │  │   <100ms     │  │    50+     │  │
-│   │   TPR        │  │    FPR       │  │   Latency    │  │   Users    │  │
-│   └──────────────┘  └──────────────┘  └──────────────┘  └────────────┘  │
-│                                                                          │
-├─────────────────────────────────────────────────────────────────────────┤
-│                      SMART VETO MECHANISM                                │
-│                                                                          │
-│   PRIMARY (ST-GCN++) ≥ 94%  ──┬──  VETO (MS-G3D) ≥ 85%  →  🚨 VIOLENCE  │
-│                               │                                          │
-│                               └──  VETO (MS-G3D) < 85%  →  ❌ VETOED     │
-│                                                                          │
-│   PRIMARY (ST-GCN++) < 94%  ────────────────────────────→  ✅ SAFE       │
-│                                                                          │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+![Figure 4: Graphical Abstract](images/fig4_graphical_abstract.png)
+
+*Figure 4: Graphical Abstract of NexaraVision. The system processes 30 FPS video through skeleton extraction (YOLOv26) and dual-model Smart Veto ensemble (ST-GCN++ and MS-G3D) to generate alerts. Key metrics: 97.4% TPR, 0.1% FPR, <100ms latency, supporting 50+ concurrent users.*
 
 ---
 
