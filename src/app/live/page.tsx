@@ -54,6 +54,7 @@ import {
 import { useDetectionSettings } from '@/hooks/useDetectionSettings';
 import { useAlertSettings } from '@/hooks/useAlertSettings';
 import { useAuth } from '@/contexts/AuthContext';
+import { useModelConfiguration } from '@/hooks/useModelConfiguration';
 import { createLogger, wsLogger, incidentLogger, alertLogger } from '@/lib/logger';
 
 // Module-specific loggers
@@ -356,6 +357,9 @@ export default function LivePage() {
 
   // Detection settings from Supabase (per-user) with localStorage fallback
   const { settings: detectionSettings, isLoading: settingsLoading, isAuthenticated: settingsAuthenticated } = useDetectionSettings();
+
+  // Model configuration for dynamic Smart Veto display
+  const { config: modelConfig, primaryModelSpec, vetoModelSpec, isLoading: modelConfigLoading } = useModelConfiguration();
 
   // Auth context for user ID
   const { user } = useAuth();
@@ -2590,7 +2594,9 @@ export default function LivePage() {
                       {detectionMode === 'server' ? 'Smart Veto Ensemble' : 'MoveNet Lightning'}
                     </div>
                     <div className="text-xs text-slate-500">
-                      {detectionMode === 'server' ? 'STGCNPP 94% + MSG3D 85%' : 'TensorFlow.js WebGL'}
+                      {detectionMode === 'server'
+                        ? `${primaryModelSpec?.displayName || 'Loading...'} ${modelConfig.primary_threshold}% + ${vetoModelSpec?.displayName || 'Loading...'} ${modelConfig.veto_threshold}%`
+                        : 'TensorFlow.js WebGL'}
                     </div>
                   </div>
                 </div>
@@ -2599,14 +2605,14 @@ export default function LivePage() {
                 <div className="flex items-center gap-2 mb-3 text-xs">
                   <div className={cn(
                     'w-2 h-2 rounded-full',
-                    settingsLoading ? 'bg-amber-500 animate-pulse' :
+                    (settingsLoading || modelConfigLoading) ? 'bg-amber-500 animate-pulse' :
                     settingsAuthenticated ? 'bg-green-500' : 'bg-slate-500'
                   )} />
                   <span className={cn(
-                    settingsLoading ? 'text-amber-400' :
+                    (settingsLoading || modelConfigLoading) ? 'text-amber-400' :
                     settingsAuthenticated ? 'text-green-400' : 'text-slate-400'
                   )}>
-                    {settingsLoading ? 'Loading settings...' :
+                    {(settingsLoading || modelConfigLoading) ? 'Loading settings...' :
                      settingsAuthenticated ? 'Per-user cloud settings' : 'Local settings'}
                   </span>
                 </div>
