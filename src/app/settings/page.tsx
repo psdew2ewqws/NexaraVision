@@ -1,6 +1,6 @@
 'use client';
 
-// Build: 2026-01-22T16:00:00Z - Force Vercel cache invalidation v2
+// Build: 2026-01-23T18:00:00Z - Force Vercel cache invalidation v3
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLanguage } from '@/i18n/LanguageContext';
