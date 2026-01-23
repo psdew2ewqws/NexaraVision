@@ -376,9 +376,10 @@ export default function LivePage() {
   const activeCameraRef = useRef<CameraRecord | null>(null);
   const defaultLocationRef = useRef<Location | null>(null);
 
-  // Refs for alertSettings and user to avoid stale closures in WebSocket callbacks
+  // Refs for alertSettings, user, and modelConfig to avoid stale closures in WebSocket callbacks
   const alertSettingsRef = useRef(alertSettings);
   const userRef = useRef(user);
+  const modelConfigRef = useRef(modelConfig);
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -585,14 +586,21 @@ export default function LivePage() {
     setGridCameras(regions);
   };
 
-  // Send config to server - reserved for dynamic settings sync
+  // Send config to server - for dynamic settings sync when user changes model config
   const _sendConfigToServer = useCallback(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      // FIX: Send modelConfig for server-side Smart Veto settings
       const configMessage = {
         type: 'config',
+        userId: userRef.current?.id,
+        // Server-side Smart Veto model configuration
+        primary_model: modelConfig.primary_model,
+        primary_threshold: modelConfig.primary_threshold,
+        veto_model: modelConfig.veto_model,
+        veto_threshold: modelConfig.veto_threshold,
+        smart_veto_enabled: modelConfig.smart_veto_enabled,
+        // Client-side alert settings
         settings: {
-          primary_threshold: detectionSettings.primary_threshold,
-          veto_threshold: detectionSettings.veto_threshold,
           instant_trigger_threshold: detectionSettings.instant_trigger_threshold,
           instant_trigger_count: detectionSettings.instant_trigger_count,
           sustained_threshold: detectionSettings.sustained_threshold,
@@ -601,7 +609,7 @@ export default function LivePage() {
       };
       wsRef.current.send(JSON.stringify(configMessage));
     }
-  }, [detectionSettings]);
+  }, [modelConfig, detectionSettings]);
 
   // Setup WebRTC DataChannel for low-latency frame transmission
   const setupWebRTC = async () => {
@@ -725,12 +733,20 @@ export default function LivePage() {
           setStatus('active');
 
           // Send current config to server on connection, including userId for per-user model config
+          // FIX: Use modelConfigRef for server-side Smart Veto settings (model selection + thresholds)
+          // detectionSettings is for client-side alert triggers only
+          const currentModelConfig = modelConfigRef.current;
           const configMessage = {
             type: 'config',
-            userId: userRef.current?.id,  // For per-user model threshold configuration
+            userId: userRef.current?.id,  // For per-user model configuration
+            // Server-side Smart Veto model configuration
+            primary_model: currentModelConfig.primary_model,
+            primary_threshold: currentModelConfig.primary_threshold,
+            veto_model: currentModelConfig.veto_model,
+            veto_threshold: currentModelConfig.veto_threshold,
+            smart_veto_enabled: currentModelConfig.smart_veto_enabled,
+            // Client-side alert settings (for local alert triggering)
             settings: {
-              primary_threshold: detectionSettings.primary_threshold,
-              veto_threshold: detectionSettings.veto_threshold,
               instant_trigger_threshold: detectionSettings.instant_trigger_threshold,
               instant_trigger_count: detectionSettings.instant_trigger_count,
               sustained_threshold: detectionSettings.sustained_threshold,
@@ -738,6 +754,7 @@ export default function LivePage() {
             }
           };
           ws.send(JSON.stringify(configMessage));
+          liveLog.info('[WS] Sent model config:', currentModelConfig.primary_model, '@', currentModelConfig.primary_threshold, '/', currentModelConfig.veto_model, '@', currentModelConfig.veto_threshold);
 
           // Setup WebRTC DataChannel for low-latency transmission
           setTimeout(() => setupWebRTC(), 500);
@@ -1934,6 +1951,11 @@ export default function LivePage() {
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  // Sync modelConfigRef to avoid stale closures in WebSocket callbacks
+  useEffect(() => {
+    modelConfigRef.current = modelConfig;
+  }, [modelConfig]);
 
   // Sync isActiveRef with isActive state (prevents stale closure in WS onclose)
   useEffect(() => {
