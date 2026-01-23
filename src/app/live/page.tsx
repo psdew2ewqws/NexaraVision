@@ -1016,6 +1016,7 @@ export default function LivePage() {
             setDefaultLocation(newLoc);
           } else {
             incidentLogger.error('[Incident] Fallback location failed:', locErr);
+            console.error('[Incident Debug] Location fallback FAILED:', locErr);
           }
         } catch (err) {
           incidentLogger.error('[Incident] Location creation exception:', err);
@@ -1032,12 +1033,16 @@ export default function LivePage() {
             setActiveCamera(newCam);
           } else {
             incidentLogger.error('[Incident] Fallback camera failed:', camErr);
+            console.error('[Incident Debug] Camera fallback FAILED:', camErr);
           }
         } catch (err) {
           incidentLogger.error('[Incident] Camera creation exception:', err);
         }
       }
     }
+
+    // DEBUG: Log camera/location status
+    console.log('[Incident Debug] Camera:', camera?.id, 'Location:', location?.id, 'ShouldCreate:', shouldCreateNewIncident);
 
     if (shouldCreateNewIncident && camera?.id && location?.id) {
       lastIncidentTimeRef.current = now;
@@ -1117,7 +1122,8 @@ export default function LivePage() {
       }
     } else if (shouldCreateNewIncident) {
       incidentLogger.error('[Incident] ❌ Cannot create - missing camera or location after fallback. Camera:', camera?.id, 'Location:', location?.id);
-      setDbError('Cannot save incidents - database setup required. Go to /debug to fix.');
+      console.error('[Incident Debug] FAILED - Camera:', camera, 'Location:', location);
+      setDbError(`Cannot save incidents - ${!camera?.id ? 'camera' : 'location'} not created. Check browser console for details.`);
       // Still show alert to user even if DB save failed
       setAlerts((prev) => [...prev, {
         time: new Date(),
