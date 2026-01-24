@@ -195,23 +195,31 @@ export default function RecordingsPage() {
     return () => { cancelled = true; };
   }, [selectedRecording]);
 
-  // Filter incidents by tab - show ALL incidents (not just ones with media)
-  // Media may still be uploading, so we show incidents immediately
+  // Filter incidents by tab
+  // Note: Thumbnail is now uploaded synchronously, so incidents should always have thumbnail_url
+  // We still filter by media to ensure the "Recordings" page shows viewable content
+  // Incidents without any media (edge case: upload failed) go to a separate view if needed
   const filteredIncidents = useMemo(() => {
-    if (activeTab === 'all') return incidents;
-    if (activeTab === 'detected') return incidents.filter(i => i.status === 'detected' || i.status === 'acknowledged' || i.status === 'responding');
-    if (activeTab === 'resolved') return incidents.filter(i => i.status === 'resolved');
-    if (activeTab === 'false_positive') return incidents.filter(i => i.status === 'false_positive');
-    return incidents;
+    // Filter to incidents with media (thumbnail or video)
+    const withMedia = incidents.filter(i => i.video_url || i.thumbnail_url);
+
+    if (activeTab === 'all') return withMedia;
+    if (activeTab === 'detected') return withMedia.filter(i => i.status === 'detected' || i.status === 'acknowledged' || i.status === 'responding');
+    if (activeTab === 'resolved') return withMedia.filter(i => i.status === 'resolved');
+    if (activeTab === 'false_positive') return withMedia.filter(i => i.status === 'false_positive');
+    return withMedia;
   }, [incidents, activeTab]);
 
-  // Count by status - count ALL incidents
+  // Count by status - only count incidents with media (matches filter above)
   const counts = useMemo(() => {
+    const withMedia = incidents.filter(i => i.video_url || i.thumbnail_url);
+    const withoutMedia = incidents.filter(i => !i.video_url && !i.thumbnail_url);
     return {
-      all: incidents.length,
-      detected: incidents.filter(i => i.status === 'detected' || i.status === 'acknowledged' || i.status === 'responding').length,
-      resolved: incidents.filter(i => i.status === 'resolved').length,
-      false_positive: incidents.filter(i => i.status === 'false_positive').length,
+      all: withMedia.length,
+      detected: withMedia.filter(i => i.status === 'detected' || i.status === 'acknowledged' || i.status === 'responding').length,
+      resolved: withMedia.filter(i => i.status === 'resolved').length,
+      false_positive: withMedia.filter(i => i.status === 'false_positive').length,
+      pendingMedia: withoutMedia.length, // Incidents waiting for media upload
     };
   }, [incidents]);
 
@@ -271,7 +279,14 @@ export default function RecordingsPage() {
                 Live
               </span>
             </h1>
-            <p className="text-slate-500 text-xs sm:text-sm">{t.subtitle}</p>
+            <p className="text-slate-500 text-xs sm:text-sm">
+              {t.subtitle}
+              {counts.pendingMedia > 0 && (
+                <span className="ml-2 text-amber-400">
+                  ({counts.pendingMedia} uploading...)
+                </span>
+              )}
+            </p>
           </div>
           <div className="flex gap-2">
             <Button
