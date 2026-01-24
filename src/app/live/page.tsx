@@ -401,6 +401,10 @@ export default function LivePage() {
   const poseDetectorRef = useRef<PoseDetector | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // BROWSER MODE VIOLENCE DETECTION: Track previous keypoints for velocity analysis
+  const prevKeypointsRef = useRef<Map<number, { x: number; y: number; timestamp: number }[]>>(new Map());
+  const velocityHistoryRef = useRef<number[]>([]);  // Rolling average of velocities
+
   // Recording refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -465,10 +469,18 @@ export default function LivePage() {
   };
 
   // Start webcam
+  // WEBCAM LAG FIX: Use lower resolution (640x480) for browser mode to reduce TensorFlow.js load
+  // Server mode uses higher resolution since processing happens on GPU server
   const startWebcam = async () => {
     try {
+      // Lower resolution for browser mode = 4x fewer pixels for pose detection
+      const isServerMode = detectionMode === 'server';
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+        video: {
+          width: { ideal: isServerMode ? 1280 : 640 },
+          height: { ideal: isServerMode ? 720 : 480 },
+          frameRate: { ideal: isServerMode ? 30 : 15 }  // Also lower FPS for browser
+        },
         audio: false,
       });
       streamRef.current = stream;
@@ -1202,12 +1214,14 @@ export default function LivePage() {
       return;
     }
 
-    // Frame rate throttling - only process at TARGET_FPS (GAP-007 fix)
+    // Frame rate throttling - apply to BOTH browser and server modes (WEBCAM LAG FIX)
+    // Previously only applied to server mode, causing browser mode to run at 60fps which overwhelmed TensorFlow.js
     const now = performance.now();
-    if (detectionMode === 'server' && now - lastFrameSentTimeRef.current < FRAME_INTERVAL_MS) {
+    if (now - lastFrameSentTimeRef.current < FRAME_INTERVAL_MS) {
       animationRef.current = requestAnimationFrame(runDetectionLoop);
       return;
     }
+    lastFrameSentTimeRef.current = now;  // Update throttle timestamp for both modes
 
     // Ensure video has valid dimensions
     if (video.videoWidth === 0 || video.videoHeight === 0) {
@@ -1227,8 +1241,11 @@ export default function LivePage() {
       canvasHeight = Math.round(canvasHeight * scale);
     }
 
-    canvas.width = canvasWidth;
-    canvas.height = canvasHeight;
+    // WEBCAM LAG FIX: Only update canvas dimensions when they change
+    if (canvas.width !== canvasWidth || canvas.height !== canvasHeight) {
+      canvas.width = canvasWidth;
+      canvas.height = canvasHeight;
+    }
     ctx.drawImage(video, 0, 0, canvasWidth, canvasHeight);
 
     setStats((prev) => ({
@@ -1238,10 +1255,11 @@ export default function LivePage() {
 
     if (detectionMode === 'browser' && poseDetectorRef.current) {
       try {
+        // WEBCAM LAG FIX: Frame rate throttling (applied above) limits to 10fps
+        // This makes pose estimation manageable on webcam at 1280x720
         const poses = await poseDetectorRef.current.estimatePoses(video);
-         
+
         drawPoses(poses);
-         
         analyzePostures(poses);
       } catch (err) {
         detectionLog.error('Pose detection error:', err);
@@ -1298,8 +1316,14 @@ export default function LivePage() {
     const ctx = overlay.getContext('2d');
     if (!ctx || !videoRef.current) return;
 
-    overlay.width = videoRef.current.videoWidth;
-    overlay.height = videoRef.current.videoHeight;
+    // WEBCAM LAG FIX: Only update canvas dimensions when they actually change
+    // Setting canvas.width/height resets the context and is very expensive
+    const targetWidth = videoRef.current.videoWidth;
+    const targetHeight = videoRef.current.videoHeight;
+    if (overlay.width !== targetWidth || overlay.height !== targetHeight) {
+      overlay.width = targetWidth;
+      overlay.height = targetHeight;
+    }
     ctx.clearRect(0, 0, overlay.width, overlay.height);
 
     const connections = [
@@ -1353,8 +1377,13 @@ export default function LivePage() {
       // Container dimensions
       const containerWidth = video.clientWidth || video.videoWidth || 640;
       const containerHeight = video.clientHeight || video.videoHeight || 480;
-      canvas.width = containerWidth;
-      canvas.height = containerHeight;
+
+      // WEBCAM LAG FIX: Only update canvas dimensions when they actually change
+      // Setting canvas.width/height resets the context and is expensive
+      if (canvas.width !== containerWidth || canvas.height !== containerHeight) {
+        canvas.width = containerWidth;
+        canvas.height = containerHeight;
+      }
 
       // Clear with transparency
       ctx.clearRect(0, 0, containerWidth, containerHeight);
@@ -1478,9 +1507,12 @@ export default function LivePage() {
     const containerWidth = video.clientWidth || videoNativeWidth;
     const containerHeight = video.clientHeight || videoNativeHeight;
 
-    // Set canvas to match container size
-    overlay.width = containerWidth;
-    overlay.height = containerHeight;
+    // WEBCAM LAG FIX: Only update canvas dimensions when they actually change
+    // Setting canvas.width/height resets the WebGL context and is very expensive
+    if (overlay.width !== containerWidth || overlay.height !== containerHeight) {
+      overlay.width = containerWidth;
+      overlay.height = containerHeight;
+    }
     ctx.clearRect(0, 0, containerWidth, containerHeight);
 
     // MOBILE FIX: Calculate actual video content area within container (object-contain letterboxing)
@@ -1571,27 +1603,86 @@ export default function LivePage() {
     });
   };
 
-  // Analyze postures for violence
+  // Analyze postures for violence with velocity/motion tracking
+  // BROWSER MODE VIOLENCE DETECTION FIX: Added motion analysis to actually detect violent movements
   const analyzePostures = (poses: DetectedPose[]) => {
     if (poses.length < 1) return;
 
+    const now = performance.now();
     let violenceScore = 0;
+    let maxVelocity = 0;
 
-    poses.forEach((pose) => {
+    // Violence detection keypoints: wrists (9,10), elbows (7,8), ankles (15,16), knees (13,14)
+    const VIOLENCE_KEYPOINTS = [7, 8, 9, 10, 13, 14, 15, 16];
+    const VELOCITY_THRESHOLD = 15;     // Pixels per frame for "fast" movement
+    const RAPID_VELOCITY_THRESHOLD = 30;  // Very fast = likely strike
+
+    poses.forEach((pose, poseIndex) => {
       const keypoints = pose.keypoints;
+      const prevPoseKeypoints = prevKeypointsRef.current.get(poseIndex) || [];
+
+      // Calculate velocities for violence-relevant keypoints
+      VIOLENCE_KEYPOINTS.forEach((kpIndex) => {
+        const kp = keypoints[kpIndex];
+        if (!kp || kp.score < 0.3) return;
+
+        // Find previous position for this keypoint
+        const prevKp = prevPoseKeypoints[kpIndex];
+        if (prevKp) {
+          const dx = kp.x - prevKp.x;
+          const dy = kp.y - prevKp.y;
+          const dt = (now - prevKp.timestamp) / 1000; // seconds
+          if (dt > 0 && dt < 0.5) {  // Valid time delta (ignore stale data)
+            const velocity = Math.hypot(dx, dy) / dt;
+            maxVelocity = Math.max(maxVelocity, velocity);
+
+            // Fast movement of arms/legs
+            if (velocity > VELOCITY_THRESHOLD * 60) {  // pixels/second
+              violenceScore += 10;
+            }
+            // Very rapid movement (punch/kick)
+            if (velocity > RAPID_VELOCITY_THRESHOLD * 60) {
+              violenceScore += 25;
+            }
+          }
+        }
+      });
+
+      // Update previous keypoints for next frame
+      const newPrevKeypoints: { x: number; y: number; timestamp: number }[] = [];
+      keypoints.forEach((kp, idx) => {
+        if (kp && kp.score > 0.3) {
+          newPrevKeypoints[idx] = { x: kp.x, y: kp.y, timestamp: now };
+        }
+      });
+      prevKeypointsRef.current.set(poseIndex, newPrevKeypoints);
+
+      // Static pose indicators (original checks, reduced weight)
       const leftWrist = keypoints[9];
       const rightWrist = keypoints[10];
       const leftShoulder = keypoints[5];
       const rightShoulder = keypoints[6];
 
+      // Arms raised (defensive/offensive stance)
       if (leftWrist?.score > 0.3 && leftShoulder?.score > 0.3) {
-        if (leftWrist.y < leftShoulder.y) violenceScore += 15;
+        if (leftWrist.y < leftShoulder.y) violenceScore += 8;
       }
       if (rightWrist?.score > 0.3 && rightShoulder?.score > 0.3) {
-        if (rightWrist.y < rightShoulder.y) violenceScore += 15;
+        if (rightWrist.y < rightShoulder.y) violenceScore += 8;
+      }
+
+      // Arm extended forward (punching motion) - wrist far from shoulder horizontally
+      if (leftWrist?.score > 0.3 && leftShoulder?.score > 0.3) {
+        const horizontalDist = Math.abs(leftWrist.x - leftShoulder.x);
+        if (horizontalDist > 100) violenceScore += 12;  // Extended arm
+      }
+      if (rightWrist?.score > 0.3 && rightShoulder?.score > 0.3) {
+        const horizontalDist = Math.abs(rightWrist.x - rightShoulder.x);
+        if (horizontalDist > 100) violenceScore += 12;
       }
     });
 
+    // Two people in close proximity (potential altercation)
     if (poses.length >= 2) {
       const pose1 = poses[0];
       const pose2 = poses[1];
@@ -1600,14 +1691,33 @@ export default function LivePage() {
 
       if (hip1?.score > 0.3 && hip2?.score > 0.3) {
         const distance = Math.hypot(hip1.x - hip2.x, hip1.y - hip2.y);
-        if (distance < 150) violenceScore += 30;
+        if (distance < 200) violenceScore += 20;  // Close proximity
+        if (distance < 100) violenceScore += 15;  // Very close (fighting distance)
       }
+    }
+
+    // Track velocity history for sustained rapid movement detection
+    velocityHistoryRef.current.push(maxVelocity);
+    if (velocityHistoryRef.current.length > 10) {
+      velocityHistoryRef.current.shift();  // Keep last 10 frames
+    }
+
+    // Bonus for sustained rapid movement (multiple fast frames = violence)
+    const avgVelocity = velocityHistoryRef.current.reduce((a, b) => a + b, 0) / velocityHistoryRef.current.length;
+    if (avgVelocity > VELOCITY_THRESHOLD * 30) {  // Sustained fast movement
+      violenceScore += 15;
+    }
+
+    // Clean up old pose tracking (limit to 5 poses)
+    if (prevKeypointsRef.current.size > 5) {
+      const keys = Array.from(prevKeypointsRef.current.keys());
+      keys.slice(0, keys.length - 5).forEach(k => prevKeypointsRef.current.delete(k));
     }
 
     violenceScore = Math.min(100, violenceScore);
     processDetectionResult({
       violence_probability: violenceScore / 100,
-      model_used: 'MoveNet',
+      model_used: 'MoveNet+Velocity',
       inference_time: 15,
       poses_detected: poses.length,
     });
@@ -1883,6 +1993,10 @@ export default function LivePage() {
   const stopDetection = async () => {
     setIsActive(false);
     setStatus('idle');
+
+    // Clear velocity tracking refs to prevent stale data on restart
+    prevKeypointsRef.current.clear();
+    velocityHistoryRef.current = [];
 
     // Stop recording (discards any current recording)
     stopRecording();
