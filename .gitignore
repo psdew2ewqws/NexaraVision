@@ -50,3 +50,7 @@ grid_detection/
 # Misc
 *.log
 .DS_Store
+
+# Playwright
+test-results/
+playwright-report/

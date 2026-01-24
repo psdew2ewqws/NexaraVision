@@ -33,10 +33,12 @@ const LEGACY_STORAGE_KEY = 'nexara-detection-settings';
 
 interface UseDetectionSettingsResult {
   settings: DetectionSettings;
+  loading: boolean;
   isLoading: boolean;
   isSaving: boolean;
   error: string | null;
   updateSetting: <K extends keyof DetectionSettings>(key: K, value: DetectionSettings[K]) => void;
+  updateSettings: (updates: Partial<DetectionSettings>) => Promise<boolean>;
   saveSettings: () => Promise<boolean>;
   resetToDefaults: () => void;
   isAuthenticated: boolean;
@@ -234,12 +236,43 @@ export function useDetectionSettings(): UseDetectionSettingsResult {
     setSettings(DEFAULT_DETECTION_SETTINGS);
   }, []);
 
+  // Bulk update and save settings (used by onboarding)
+  const updateSettings = useCallback(async (updates: Partial<DetectionSettings>): Promise<boolean> => {
+    const newSettings = { ...settings, ...updates };
+    setSettings(newSettings);
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      if (userId) {
+        const success = await saveToSupabase(userId, newSettings);
+        if (!success) {
+          saveToLocalStorage(newSettings);
+        }
+        return true;
+      } else {
+        saveToLocalStorage(newSettings);
+        return true;
+      }
+    } catch (err) {
+      log.error('[Detection Settings] Error updating:', err);
+      setError('Failed to update settings');
+      saveToLocalStorage(newSettings);
+      return true;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [userId, settings]);
+
   return {
     settings,
+    loading: isLoading,
     isLoading,
     isSaving,
     error,
     updateSetting,
+    updateSettings,
     saveSettings,
     resetToDefaults,
     isAuthenticated: !!userId,

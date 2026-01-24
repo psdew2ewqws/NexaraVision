@@ -43,8 +43,21 @@ export async function GET(request: Request) {
       let redirectPath = next;
 
       if (type === 'signup') {
-        // Email confirmed - redirect to login with success message
-        redirectPath = '/login?confirmed=true';
+        // Email confirmed - check if user needs onboarding
+        // New users go to onboarding, existing users go to login
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('onboarding_completed')
+          .eq('id', (await supabase.auth.getUser()).data.user?.id)
+          .single();
+
+        if (profile && !profile.onboarding_completed) {
+          // New user - redirect to onboarding
+          redirectPath = '/onboarding';
+        } else {
+          // Existing user or re-confirmation - redirect to login
+          redirectPath = '/login?confirmed=true';
+        }
       } else if (type === 'recovery') {
         // Password recovery - redirect to settings/password reset
         redirectPath = '/settings?reset=true';

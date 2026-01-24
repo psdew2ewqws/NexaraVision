@@ -83,9 +83,19 @@ function LoginForm() {
         : 'Please confirm your email address before logging in. Check your inbox for the confirmation link.');
       setLoading(false);
     } else {
+      // Check if user has completed onboarding
+      const profileCheck = await supabase
+        .from('profiles')
+        .select('onboarding_completed')
+        .eq('id', data.user.id)
+        .single();
+
+      const needsOnboarding = !profileCheck.data?.onboarding_completed;
+
       // Use full page reload instead of soft navigation to ensure auth state refreshes
       // This fixes the issue where user appears not logged in after login
-      window.location.href = redirect;
+      // Redirect to onboarding if not completed, otherwise to requested destination
+      window.location.href = needsOnboarding ? '/onboarding' : redirect;
     }
   };
 

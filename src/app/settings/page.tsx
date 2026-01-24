@@ -9,7 +9,7 @@ import { useDetectionSettings, DEFAULT_DETECTION_SETTINGS } from '@/hooks/useDet
 import { useAlertSettings } from '@/hooks/useAlertSettings';
 import { useModelConfiguration } from '@/hooks/useModelConfiguration';
 import { useAuth } from '@/contexts/AuthContext';
-import { validatePhone, getLocalizedError } from '@/lib/validation';
+import { validatePhone, getLocalizedError, checkWhatsAppDuplicate } from '@/lib/validation';
 import {
   SettingsSection,
   SliderSetting,
@@ -326,6 +326,15 @@ export default function SettingsPage() {
     const validation = validatePhone(whatsappPhone, true);
     if (!validation.isValid) {
       setWhatsappPhoneError(getLocalizedError(validation.error, locale) || validation.error || null);
+      return;
+    }
+    // Check for duplicate phone number (excluding current user)
+    const duplicateCheck = await checkWhatsAppDuplicate(whatsappPhone, user?.id);
+    if (duplicateCheck.isDuplicate) {
+      const duplicateError = locale === 'ar'
+        ? 'رقم الهاتف هذا مسجل بالفعل لمستخدم آخر'
+        : 'This phone number is already registered by another user';
+      setWhatsappPhoneError(duplicateError);
       return;
     }
     await updateAlertSettings({

@@ -27,6 +27,7 @@ CREATE TABLE profiles (
     telegram_id TEXT,  -- For Telegram alerts
     language TEXT DEFAULT 'en',  -- 'en' or 'ar'
     avatar_url TEXT,
+    onboarding_completed BOOLEAN DEFAULT false,  -- Whether user completed initial setup wizard
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );

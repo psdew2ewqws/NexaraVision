@@ -287,7 +287,37 @@ export const validationErrorsAr: Record<string, string> = {
   'Enter a valid phone with country code (e.g., +966501234567)': 'أدخل رقم هاتف صحيح مع رمز الدولة (مثال: 966501234567+)',
   'Full name is required': 'الاسم الكامل مطلوب',
   'Name must be at least 2 characters': 'يجب أن يكون الاسم حرفين على الأقل',
+  'This phone number is already registered': 'رقم الهاتف هذا مسجل بالفعل لمستخدم آخر',
 };
+
+/**
+ * Check if a WhatsApp number is already in use by another user
+ * @param phone - The phone number to check
+ * @param excludeUserId - Optional user ID to exclude from the check (for current user)
+ * @returns Promise<{ isDuplicate: boolean; error?: string }>
+ */
+export async function checkWhatsAppDuplicate(
+  phone: string,
+  excludeUserId?: string
+): Promise<{ isDuplicate: boolean; error?: string }> {
+  try {
+    const response = await fetch('/api/whatsapp/check-duplicate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, excludeUserId }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      return { isDuplicate: false, error: data.error || 'Failed to check phone number' };
+    }
+
+    return { isDuplicate: data.isDuplicate };
+  } catch {
+    return { isDuplicate: false, error: 'Network error checking phone number' };
+  }
+}
 
 /**
  * Get localized error message
