@@ -992,19 +992,17 @@ export default function LivePage() {
     setAlerts((prev) => [...prev, { time: new Date(), confidence }]);
     setStats((prev) => ({ ...prev, fightCount: prev.fightCount + 1 }));
 
-    // Throttle incident creation - minimum 10 seconds between incidents
-     
-    const now = Date.now();
-    const timeSinceLastIncident = now - lastIncidentTimeRef.current;
-    const shouldCreateNewIncident = timeSinceLastIncident > 10000; // 10 seconds
-
     // Save incident IMMEDIATELY to database (without video first)
     // CRITICAL: Use refs (not state) to avoid stale closure in WebSocket callback
+    // NOTE: Backend handles incident grouping within 60-second window - every detection
+    // should call createIncidentWithRecording, which will either create new incident or
+    // add screenshot to existing one
     let camera = activeCameraRef.current;
     let location = defaultLocationRef.current;
+    const now = Date.now();
 
     // If camera or location is missing, try to create them now (fallback)
-    if (shouldCreateNewIncident && (!camera?.id || !location?.id)) {
+    if (!camera?.id || !location?.id) {
 
       // Try to create location if missing
       if (!location?.id) {
@@ -1042,10 +1040,11 @@ export default function LivePage() {
     }
 
     // DEBUG: Log camera/location status
-    console.log('[Incident Debug] Camera:', camera?.id, 'Location:', location?.id, 'ShouldCreate:', shouldCreateNewIncident);
+    console.log('[Incident Debug] Camera:', camera?.id, 'Location:', location?.id);
 
-    if (shouldCreateNewIncident && camera?.id && location?.id) {
-      lastIncidentTimeRef.current = now;
+    // Always call createIncidentWithRecording - backend handles grouping
+    // (adds screenshot to existing incident within 60s window, or creates new one)
+    if (camera?.id && location?.id) {
 
       // Capture thumbnail immediately
       let thumbnailBlob: Blob | null = null;
@@ -1120,7 +1119,7 @@ export default function LivePage() {
           error: 'Failed to save to database'
         }]);
       }
-    } else if (shouldCreateNewIncident) {
+    } else {
       incidentLogger.error('[Incident] ❌ Cannot create - missing camera or location after fallback. Camera:', camera?.id, 'Location:', location?.id);
       console.error('[Incident Debug] FAILED - Camera:', camera, 'Location:', location);
       setDbError(`Cannot save incidents - ${!camera?.id ? 'camera' : 'location'} not created. Check browser console for details.`);

@@ -195,26 +195,23 @@ export default function RecordingsPage() {
     return () => { cancelled = true; };
   }, [selectedRecording]);
 
-  // Filter incidents by tab (only show ones with video/thumbnail)
+  // Filter incidents by tab - show ALL incidents (not just ones with media)
+  // Media may still be uploading, so we show incidents immediately
   const filteredIncidents = useMemo(() => {
-    // Get incidents that have recordings
-    const recordedIncidents = incidents.filter(i => i.video_url || i.thumbnail_url);
-
-    if (activeTab === 'all') return recordedIncidents;
-    if (activeTab === 'detected') return recordedIncidents.filter(i => i.status === 'detected' || i.status === 'acknowledged' || i.status === 'responding');
-    if (activeTab === 'resolved') return recordedIncidents.filter(i => i.status === 'resolved');
-    if (activeTab === 'false_positive') return recordedIncidents.filter(i => i.status === 'false_positive');
-    return recordedIncidents;
+    if (activeTab === 'all') return incidents;
+    if (activeTab === 'detected') return incidents.filter(i => i.status === 'detected' || i.status === 'acknowledged' || i.status === 'responding');
+    if (activeTab === 'resolved') return incidents.filter(i => i.status === 'resolved');
+    if (activeTab === 'false_positive') return incidents.filter(i => i.status === 'false_positive');
+    return incidents;
   }, [incidents, activeTab]);
 
-  // Count by status
+  // Count by status - count ALL incidents
   const counts = useMemo(() => {
-    const recorded = incidents.filter(i => i.video_url || i.thumbnail_url);
     return {
-      all: recorded.length,
-      detected: recorded.filter(i => i.status === 'detected' || i.status === 'acknowledged' || i.status === 'responding').length,
-      resolved: recorded.filter(i => i.status === 'resolved').length,
-      false_positive: recorded.filter(i => i.status === 'false_positive').length,
+      all: incidents.length,
+      detected: incidents.filter(i => i.status === 'detected' || i.status === 'acknowledged' || i.status === 'responding').length,
+      resolved: incidents.filter(i => i.status === 'resolved').length,
+      false_positive: incidents.filter(i => i.status === 'false_positive').length,
     };
   }, [incidents]);
 
@@ -267,13 +264,35 @@ export default function RecordingsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4">
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold text-white">{t.title}</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+              {t.title}
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-emerald-500/20 text-emerald-400 rounded-full">
+                <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
+                Live
+              </span>
+            </h1>
             <p className="text-slate-500 text-xs sm:text-sm">{t.subtitle}</p>
           </div>
-          <Button variant="outline" onClick={() => router.push('/live')} className="min-h-[44px] active:scale-95 transition-transform">
-            <Play className="w-4 h-4 mr-2" />
-            {t.goToLive}
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={refresh}
+              className="min-h-[44px] active:scale-95 transition-transform"
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                </svg>
+              )}
+            </Button>
+            <Button variant="outline" onClick={() => router.push('/live')} className="min-h-[44px] active:scale-95 transition-transform">
+              <Play className="w-4 h-4 mr-2" />
+              {t.goToLive}
+            </Button>
+          </div>
         </div>
 
         {/* Tabs - Scrollable on mobile */}

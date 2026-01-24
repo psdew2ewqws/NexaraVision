@@ -365,9 +365,30 @@ export function useIncidents(limit = 50) {
     setLoading(true);
     const timeoutId = setTimeout(fetchData, 100);
 
+    // Subscribe to real-time changes for incidents table
+    const subscription = supabase
+      .channel('incidents-realtime')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen for INSERT, UPDATE, DELETE
+          schema: 'public',
+          table: 'incidents',
+        },
+        (payload) => {
+          incidentLogger.debug('[useIncidents] Real-time event:', payload.eventType);
+          // Refresh on any change
+          if (mounted) {
+            fetchData();
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       mounted = false;
       clearTimeout(timeoutId);
+      subscription.unsubscribe();
     };
   }, [limit, refreshKey, userId, authLoading]);
 
@@ -948,11 +969,32 @@ export async function createIncidentWithRecording(data: {
 
     incidentLogger.debug('[Incident] ✅ Created successfully:', incident?.id);
 
-    // Step 2: Upload video and thumbnail in background (non-blocking)
-    // This allows the incident to be created immediately while uploads happen async
-    if (incident?.id && (data.videoBlob || data.thumbnailBlob)) {
-      // Don't await - let uploads happen in background
-      uploadMediaInBackground(incident.id, data.videoBlob, data.thumbnailBlob);
+    // Step 2: Upload thumbnail SYNCHRONOUSLY to ensure it's visible immediately in /cameras
+    // Video upload happens in background since it takes longer
+    let thumbnail_url: string | null = null;
+    if (incident?.id && data.thumbnailBlob && data.thumbnailBlob.size > 0) {
+      try {
+        incidentLogger.debug('[Incident] 📸 Uploading thumbnail synchronously...');
+        thumbnail_url = await uploadThumbnailToStorage(incident.id, data.thumbnailBlob);
+        if (thumbnail_url) {
+          await updateIncidentWithUrls(incident.id, null, thumbnail_url);
+          incidentLogger.debug('[Incident] ✅ Thumbnail uploaded:', thumbnail_url);
+        }
+      } catch (thumbErr) {
+        incidentLogger.error('[Incident] ⚠️ Thumbnail upload failed (non-critical):', (thumbErr as Error)?.message);
+      }
+    }
+
+    // Video upload happens in background (takes 60 seconds to record anyway)
+    if (incident?.id && data.videoBlob && data.videoBlob.size > 0) {
+      // Don't await - let video upload happen in background
+      uploadVideoToStorage(incident.id, data.videoBlob).then(video_url => {
+        if (video_url) {
+          updateIncidentWithUrls(incident.id, video_url, null);
+        }
+      }).catch(err => {
+        storageLogger.error('[Background] Video upload failed:', (err as Error)?.message);
+      });
     }
 
     // Step 3: Send WhatsApp alerts to enabled users (non-blocking)
