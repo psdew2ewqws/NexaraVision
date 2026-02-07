@@ -963,22 +963,16 @@ export default function LivePage() {
       return;
     }
 
-    // SERVER CONFIRMED VIOLENCE - time-window accumulation (not consecutive)
+    // SERVER CONFIRMED VIOLENCE - trigger immediately
     // Server already validates: dual-model agreement + 2+ people present
+    // No need for multi-frame accumulation — server confirmation is enough
     if (isConfirmedViolence) {
       const now = Date.now();
-      // Reset counter if no violence for 3+ seconds (fight likely ended)
-      if (lastViolenceTimeRef.current > 0 && (now - lastViolenceTimeRef.current > 3000)) {
-        violenceHitsRef.current = 0;
-      }
       lastViolenceTimeRef.current = now;
-      violenceHitsRef.current++;
-      const cooldownMs = 8000; // 8 seconds between alerts
+      const cooldownMs = 5000; // 5 seconds between alerts (fast re-alerting)
       const timeSinceLastAlert = now - lastAlertTimeRef.current;
-      // Trigger after 2 server-confirmed VIOLENCE frames within the time window
-      if (violenceHitsRef.current >= 2 && timeSinceLastAlert >= cooldownMs) {
+      if (timeSinceLastAlert >= cooldownMs) {
         triggerFightAlert(violence);
-        violenceHitsRef.current = 0;
         lastAlertTimeRef.current = now;
       }
       return;
@@ -1027,143 +1021,83 @@ export default function LivePage() {
     setAlerts((prev) => [...prev, { time: new Date(), confidence }]);
     setStats((prev) => ({ ...prev, fightCount: prev.fightCount + 1 }));
 
-    // Save incident IMMEDIATELY to database (without video first)
-    // CRITICAL: Use refs (not state) to avoid stale closure in WebSocket callback
-    // NOTE: Backend handles incident grouping within 60-second window - every detection
-    // should call createIncidentWithRecording, which will either create new incident or
-    // add screenshot to existing one
+    // IMMEDIATE: Send WhatsApp alert FIRST (don't wait for DB)
+    // USE REFS to avoid stale closure in WebSocket callback
+    const currentAlertSettings = alertSettingsRef.current;
+    const currentUser = userRef.current;
     let camera = activeCameraRef.current;
     let location = defaultLocationRef.current;
-    const now = Date.now();
 
-    // If camera or location is missing, try to create them now (fallback)
+    if (currentAlertSettings?.whatsapp_enabled && currentAlertSettings?.whatsapp_number && currentUser?.id) {
+      alertLogger.debug('[WhatsApp] Sending violence alert to:', currentAlertSettings.whatsapp_number);
+      fetch('/api/whatsapp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: currentAlertSettings.whatsapp_number,
+          userId: currentUser.id,
+          incidentId: currentIncidentIdRef.current || 'pending',
+          cameraName: camera?.name || 'Browser Camera',
+          locationName: location?.name || 'Unknown Location',
+          confidence: Math.round(confidence),
+          timestamp: new Date().toISOString(),
+        }),
+      }).then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            alertLogger.debug('[WhatsApp] ✅ Alert sent successfully:', data.id);
+          } else if (data.cooldownActive) {
+            alertLogger.debug('[WhatsApp] ⏱️ Cooldown active, skipped alert');
+          } else {
+            alertLogger.error('[WhatsApp] ❌ Failed to send alert:', data.error);
+          }
+        })
+        .catch(err => alertLogger.error('[WhatsApp] ❌ Error sending alert:', err));
+    }
+
+    // Save incident to database (async, doesn't block alerts)
     if (!camera?.id || !location?.id) {
-
-      // Try to create location if missing
       if (!location?.id) {
         try {
-          const { location: newLoc, error: locErr } = await getOrCreateDefaultLocation();
-          if (newLoc) {
-            location = newLoc;
-            defaultLocationRef.current = newLoc;
-            setDefaultLocation(newLoc);
-          } else {
-            incidentLogger.error('[Incident] Fallback location failed:', locErr);
-            console.error('[Incident Debug] Location fallback FAILED:', locErr);
-          }
-        } catch (err) {
-          incidentLogger.error('[Incident] Location creation exception:', err);
-        }
+          const { location: newLoc } = await getOrCreateDefaultLocation();
+          if (newLoc) { location = newLoc; defaultLocationRef.current = newLoc; setDefaultLocation(newLoc); }
+        } catch (err) { incidentLogger.error('[Incident] Location creation exception:', err); }
       }
-
-      // Try to create camera if missing
       if (!camera?.id) {
         try {
-          const { camera: newCam, error: camErr } = await findOrCreateCamera('webcam', undefined, 'Browser Webcam');
-          if (newCam) {
-            camera = newCam;
-            activeCameraRef.current = newCam;
-            setActiveCamera(newCam);
-          } else {
-            incidentLogger.error('[Incident] Fallback camera failed:', camErr);
-            console.error('[Incident Debug] Camera fallback FAILED:', camErr);
-          }
-        } catch (err) {
-          incidentLogger.error('[Incident] Camera creation exception:', err);
-        }
+          const { camera: newCam } = await findOrCreateCamera('webcam', undefined, 'Browser Webcam');
+          if (newCam) { camera = newCam; activeCameraRef.current = newCam; setActiveCamera(newCam); }
+        } catch (err) { incidentLogger.error('[Incident] Camera creation exception:', err); }
       }
     }
 
-    // DEBUG: Log camera/location status
-    console.log('[Incident Debug] Camera:', camera?.id, 'Location:', location?.id);
-
-    // Always call createIncidentWithRecording - backend handles grouping
-    // (adds screenshot to existing incident within 60s window, or creates new one)
     if (camera?.id && location?.id) {
-
-      // Capture thumbnail immediately
       let thumbnailBlob: Blob | null = null;
       if (videoRef.current) {
         thumbnailBlob = await captureVideoFrame(videoRef.current);
       }
 
-      // Create incident right away (video will be added later if recording)
       const { incident, error } = await createIncidentWithRecording({
         camera_id: camera.id,
         location_id: location.id,
         confidence: Math.round(confidence),
         model_used: detectionMode === 'server' ? 'Smart Veto Ensemble' : 'MoveNet Lightning',
         thumbnailBlob: thumbnailBlob || undefined,
-        // No video yet - will be added when recording completes
       });
 
       if (incident) {
         currentIncidentIdRef.current = incident.id;
-        setDbError(null); // Clear any previous error
-        incidentLogger.debug('[Incident] ✅ Created incident:', incident.id);
-
-        // Send WhatsApp alert if enabled - USE REFS to avoid stale closure!
-        const currentAlertSettings = alertSettingsRef.current;
-        const currentUser = userRef.current;
-        alertLogger.debug('[WhatsApp] Check enabled:', {
-          whatsapp_enabled: currentAlertSettings?.whatsapp_enabled,
-          whatsapp_number: currentAlertSettings?.whatsapp_number,
-          userId: currentUser?.id,
-        });
-
-        if (currentAlertSettings?.whatsapp_enabled && currentAlertSettings?.whatsapp_number && currentUser?.id) {
-          alertLogger.debug('[WhatsApp] Sending violence alert to:', currentAlertSettings.whatsapp_number);
-          fetch('/api/whatsapp/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              phone: currentAlertSettings.whatsapp_number,
-              userId: currentUser.id,
-              incidentId: incident.id,
-              cameraName: camera?.name || 'Browser Camera',
-              locationName: location?.name || 'Unknown Location',
-              confidence: Math.round(confidence),
-              timestamp: new Date().toISOString(),
-            }),
-          }).then(res => res.json())
-            .then(data => {
-              if (data.success) {
-                alertLogger.debug('[WhatsApp] ✅ Alert sent successfully:', data.id);
-              } else if (data.cooldownActive) {
-                alertLogger.debug('[WhatsApp] ⏱️ Cooldown active, skipped alert');
-              } else {
-                alertLogger.error('[WhatsApp] ❌ Failed to send alert:', data.error);
-              }
-            })
-            .catch(err => alertLogger.error('[WhatsApp] ❌ Error sending alert:', err));
-        } else {
-          alertLogger.debug('[WhatsApp] Skipped - not configured or user not logged in');
-        }
+        setDbError(null);
       } else if (error) {
-        incidentLogger.error('[Incident] ❌ Failed to create:', error);
         const errMsg = (error as { message?: string; code?: string })?.message || 'Unknown error';
         const errCode = (error as { code?: string })?.code;
-        // Show error to user
         setDbError(errCode === '42501'
           ? 'Database permission denied. Go to /debug to fix RLS policies.'
           : `Failed to save incident: ${errMsg}`
         );
-        setAlerts((prev) => [...prev, {
-          time: new Date(),
-          confidence,
-          error: 'Failed to save to database'
-        }]);
       }
     } else {
-      incidentLogger.error('[Incident] ❌ Cannot create - missing camera or location after fallback. Camera:', camera?.id, 'Location:', location?.id);
-      console.error('[Incident Debug] FAILED - Camera:', camera, 'Location:', location);
-      setDbError(`Cannot save incidents - ${!camera?.id ? 'camera' : 'location'} not created. Check browser console for details.`);
-      // Still show alert to user even if DB save failed
-      setAlerts((prev) => [...prev, {
-        time: new Date(),
-        confidence,
-        error: 'Database connection issue - incident not saved'
-      }]);
+      incidentLogger.error('[Incident] ❌ Missing camera or location. Camera:', camera?.id, 'Location:', location?.id);
     }
 
     // Start recording ONCE per incident (no timer reset on re-trigger)
