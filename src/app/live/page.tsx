@@ -1245,7 +1245,7 @@ export default function LivePage() {
       }
 
       // Skip if WebSocket buffer is too full (GAP-008 fix - prevent backlog)
-      if (wsRef.current.bufferedAmount > 256 * 1024) {  // 256KB threshold (reduced for faster response)
+      if (wsRef.current.bufferedAmount > 64 * 1024) {  // 64KB (~1 frame) - prevents frame backlog that causes skeleton delay
         animationRef.current = requestAnimationFrame(runDetectionLoop);
         return;
       }
@@ -1270,7 +1270,7 @@ export default function LivePage() {
           }
         } else if (wsRef.current?.readyState === WebSocket.OPEN) {
           // Fallback to WebSocket
-          if (wsRef.current.bufferedAmount < 256 * 1024) {
+          if (wsRef.current.bufferedAmount < 64 * 1024) {
             wsRef.current.send(blob);
           }
         }
