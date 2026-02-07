@@ -397,6 +397,7 @@ export default function LivePage() {
   const _frameBufferRef = useRef<string[]>([]); // Reserved for future buffering
   const violenceHitsRef = useRef<number>(0);
   const sustainedViolenceRef = useRef<number>(0);
+  const lastAlertTimeRef = useRef<number>(0); // Cooldown: prevent alert spam
   const fightAlertTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const poseDetectorRef = useRef<PoseDetector | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -964,14 +965,19 @@ export default function LivePage() {
       return; // Don't trigger any alerts
     }
 
-    // SERVER CONFIRMED VIOLENCE - trigger alert IMMEDIATELY (no frame counting needed)
-    // The server's Smart Veto already confirmed this is real violence
+    // SERVER CONFIRMED VIOLENCE - require sustained confirmation to avoid false positives
+    // Even with Smart Veto, brief spikes (arm swings, overlapping skeletons) can trigger both models
+    // Require 5+ consecutive VIOLENCE frames AND a 15-second cooldown between alerts
     if (isConfirmedViolence) {
       violenceHitsRef.current++;
-      // Trigger after just 2 confirmed VIOLENCE frames (very fast response)
-      if (violenceHitsRef.current >= 2) {
+      const now = Date.now();
+      const cooldownMs = 15000; // 15 seconds between alerts
+      const timeSinceLastAlert = now - lastAlertTimeRef.current;
+      // Require 5 confirmed VIOLENCE frames AND cooldown elapsed
+      if (violenceHitsRef.current >= 5 && timeSinceLastAlert >= cooldownMs) {
         triggerFightAlert(violence);
         violenceHitsRef.current = 0; // Reset after triggering
+        lastAlertTimeRef.current = now;
       }
       return;
     }
@@ -989,12 +995,17 @@ export default function LivePage() {
     }
 
     // Browser mode only (no server result) - use client-side thresholds
+    const now = Date.now();
+    const cooldownMs = 15000; // 15 seconds between alerts
+    const timeSinceLastAlert = now - lastAlertTimeRef.current;
+
     // Instant trigger: N× frames at X%+
     if (violence >= currentSettings.instant_trigger_threshold) {
       violenceHitsRef.current++;
-      if (violenceHitsRef.current >= currentSettings.instant_trigger_count) {
+      if (violenceHitsRef.current >= currentSettings.instant_trigger_count && timeSinceLastAlert >= cooldownMs) {
         triggerFightAlert(violence);
         violenceHitsRef.current = 0; // Reset after triggering
+        lastAlertTimeRef.current = now;
       }
     } else {
       violenceHitsRef.current = Math.max(0, violenceHitsRef.current - 1);
@@ -1005,9 +1016,10 @@ export default function LivePage() {
     const sustainedFrameCount = currentSettings.sustained_duration * 30;
     if (violence >= currentSettings.sustained_threshold) {
       sustainedViolenceRef.current++;
-      if (sustainedViolenceRef.current >= sustainedFrameCount) {
+      if (sustainedViolenceRef.current >= sustainedFrameCount && timeSinceLastAlert >= cooldownMs) {
         triggerFightAlert(violence);
         sustainedViolenceRef.current = 0; // Reset after triggering
+        lastAlertTimeRef.current = now;
       }
     } else {
       sustainedViolenceRef.current = Math.max(0, sustainedViolenceRef.current - 10);
