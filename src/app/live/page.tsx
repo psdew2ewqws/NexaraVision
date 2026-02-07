@@ -600,29 +600,31 @@ export default function LivePage() {
   };
 
   // Send config to server - for dynamic settings sync when user changes model config
-  const _sendConfigToServer = useCallback(() => {
+  // Uses refs to always send latest values and avoid cascading dependency issues
+  const sendConfigToServer = useCallback(() => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
-      // FIX: Send modelConfig for server-side Smart Veto settings
+      const currentModelConfig = modelConfigRef.current;
+      const currentDetectionSettings = detectionSettingsRef.current;
       const configMessage = {
         type: 'config',
         userId: userRef.current?.id,
         // Server-side Smart Veto model configuration
-        primary_model: modelConfig.primary_model,
-        primary_threshold: modelConfig.primary_threshold,
-        veto_model: modelConfig.veto_model,
-        veto_threshold: modelConfig.veto_threshold,
-        smart_veto_enabled: modelConfig.smart_veto_enabled,
+        primary_model: currentModelConfig.primary_model,
+        primary_threshold: currentModelConfig.primary_threshold,
+        veto_model: currentModelConfig.veto_model,
+        veto_threshold: currentModelConfig.veto_threshold,
+        smart_veto_enabled: currentModelConfig.smart_veto_enabled,
         // Client-side alert settings
         settings: {
-          instant_trigger_threshold: detectionSettings.instant_trigger_threshold,
-          instant_trigger_count: detectionSettings.instant_trigger_count,
-          sustained_threshold: detectionSettings.sustained_threshold,
-          sustained_duration: detectionSettings.sustained_duration,
+          instant_trigger_threshold: currentDetectionSettings.instant_trigger_threshold,
+          instant_trigger_count: currentDetectionSettings.instant_trigger_count,
+          sustained_threshold: currentDetectionSettings.sustained_threshold,
+          sustained_duration: currentDetectionSettings.sustained_duration,
         }
       };
       wsRef.current.send(JSON.stringify(configMessage));
     }
-  }, [modelConfig, detectionSettings]);
+  }, []); // No dependencies - reads from refs
 
   // Setup WebRTC DataChannel for low-latency frame transmission
   const setupWebRTC = async () => {
@@ -939,12 +941,17 @@ export default function LivePage() {
 
     // Use configurable threshold for violent frame counting
     // DON'T count VETOED frames as violent
-    // CRITICAL: Use ref to avoid stale closure when called from WebSocket callback
+    // CRITICAL: Use refs to avoid stale closure when called from WebSocket callback
     const currentSettings = detectionSettingsRef.current;
+    const currentModelConfig = modelConfigRef.current;
+    // FIX: Use modelConfig.primary_threshold (94% default) for violence frame counting
+    // instead of detectionSettings.primary_threshold (50% default) which was too low
+    // and caused false positives on non-violent footage
+    const violenceThreshold = currentModelConfig.primary_threshold;
     setStats((prev) => ({
       ...prev,
       totalFrames: prev.totalFrames + 1,
-      violentFrames: (!isVetoed && violence > currentSettings.primary_threshold) ? prev.violentFrames + 1 : prev.violentFrames,
+      violentFrames: (!isVetoed && violence > violenceThreshold) ? prev.violentFrames + 1 : prev.violentFrames,
       peakViolence: Math.max(prev.peakViolence, violence),
       avgLatency: prev.avgLatency === 0 ? latency : (prev.avgLatency + latency) / 2,
     }));
@@ -969,10 +976,19 @@ export default function LivePage() {
       return;
     }
 
-    // CLIENT-SIDE THRESHOLD TRIGGERS (works in both browser and server mode)
-    // These respect user's lower thresholds even when server says SAFE
-    // Note: VETOED frames are already filtered above (line 938-942)
+    // CLIENT-SIDE THRESHOLD TRIGGERS
+    // In server mode: Skip client-side triggers when server says SAFE - trust the Smart Veto
+    // In browser mode (data.result === undefined): Use client-side thresholds for detection
+    // This prevents false positives where server says SAFE but client triggers on lower thresholds
+    if (data.result === 'SAFE') {
+      // Server's Smart Veto evaluated both models and determined this is SAFE
+      // Reset counters to prevent stale buildup from prior frames
+      violenceHitsRef.current = Math.max(0, violenceHitsRef.current - 1);
+      sustainedViolenceRef.current = Math.max(0, sustainedViolenceRef.current - 10);
+      return;
+    }
 
+    // Browser mode only (no server result) - use client-side thresholds
     // Instant trigger: N× frames at X%+
     if (violence >= currentSettings.instant_trigger_threshold) {
       violenceHitsRef.current++;
@@ -2078,14 +2094,24 @@ export default function LivePage() {
   }, [user]);
 
   // Sync modelConfigRef to avoid stale closures in WebSocket callbacks
+  // Also send updated config to server for live sessions
   useEffect(() => {
     modelConfigRef.current = modelConfig;
-  }, [modelConfig]);
+    if (isActive) {
+      sendConfigToServer();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelConfig, isActive]);
 
   // Sync detectionSettingsRef to avoid stale closures in WebSocket callbacks
+  // Also send updated settings to server for live sessions
   useEffect(() => {
     detectionSettingsRef.current = detectionSettings;
-  }, [detectionSettings]);
+    if (isActive) {
+      sendConfigToServer();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detectionSettings, isActive]);
 
   // Sync isActiveRef with isActive state (prevents stale closure in WS onclose)
   useEffect(() => {

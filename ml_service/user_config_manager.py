@@ -91,7 +91,7 @@ class CachedConfig:
     """Cached user configuration with TTL"""
     config: Dict[str, Any]
     timestamp: float
-    ttl: float = 300  # 5 minutes default
+    ttl: float = 30  # 30 seconds - reduced from 5min for faster settings propagation
 
     def is_expired(self) -> bool:
         return time.time() - self.timestamp > self.ttl
@@ -112,7 +112,7 @@ class UserConfigManager:
     def __init__(
         self,
         api_url: str = "https://nexaravision.com/api/model-config",
-        cache_ttl: float = 300,  # 5 minutes
+        cache_ttl: float = 30,  # 30 seconds - reduced for faster settings propagation
         fetch_timeout: float = 5.0,
     ):
         """
