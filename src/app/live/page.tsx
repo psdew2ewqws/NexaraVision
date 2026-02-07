@@ -1501,45 +1501,56 @@ export default function LivePage() {
     const ctx = overlay.getContext('2d');
     if (!ctx) return;
 
-    // De-duplicate skeletons that are too close (same person detected twice)
-    // Compare center of mass of each skeleton, filter out duplicates
-    // Threshold: 80px in sent frame coordinates (increased from 50px for better dedup)
-    const DEDUP_THRESHOLD = 80;
-    const dedupedSkeletons = skeletons.filter((skeleton, index) => {
-      // Calculate center of mass for this skeleton using visible keypoints
+    // PERFORMANCE: Max 3 skeletons rendered, prioritizing people near each other
+    const MAX_SKELETONS = 3;
+    const DEDUP_THRESHOLD = 80;   // Same-person dedup (px in sent frame coords)
+    const PROXIMITY_THRESHOLD = 250; // People must be this close to another person to show
+
+    // Step 1: Calculate center of mass for each skeleton
+    const skeletonCenters = skeletons.map((skeleton) => {
       let sumX = 0, sumY = 0, count = 0;
       skeleton.forEach(kp => {
-        if (kp && kp.length >= 3 && kp[2] > 0.3) { // confidence > 0.3
+        if (kp && kp.length >= 3 && kp[2] > 0.3) {
           sumX += kp[0];
           sumY += kp[1];
           count++;
         }
       });
-      if (count === 0) return true; // Keep if no keypoints (shouldn't happen)
-      const centerX = sumX / count;
-      const centerY = sumY / count;
-
-      // Check if any earlier skeleton is too close (within threshold)
-      for (let i = 0; i < index; i++) {
-        let sumX2 = 0, sumY2 = 0, count2 = 0;
-        skeletons[i].forEach(kp => {
-          if (kp && kp.length >= 3 && kp[2] > 0.3) {
-            sumX2 += kp[0];
-            sumY2 += kp[1];
-            count2++;
-          }
-        });
-        if (count2 > 0) {
-          const centerX2 = sumX2 / count2;
-          const centerY2 = sumY2 / count2;
-          const distance = Math.sqrt((centerX - centerX2) ** 2 + (centerY - centerY2) ** 2);
-          if (distance < DEDUP_THRESHOLD) {
-            return false; // Skip this skeleton, it's a duplicate
-          }
-        }
-      }
-      return true; // Keep this skeleton
+      return count > 0 ? { x: sumX / count, y: sumY / count, valid: true } : { x: 0, y: 0, valid: false };
     });
+
+    // Step 2: Dedup — remove duplicate detections of the same person
+    const dedupedIndices: number[] = [];
+    skeletonCenters.forEach((center, index) => {
+      if (!center.valid) return;
+      const isDuplicate = dedupedIndices.some(i => {
+        const other = skeletonCenters[i];
+        return Math.sqrt((center.x - other.x) ** 2 + (center.y - other.y) ** 2) < DEDUP_THRESHOLD;
+      });
+      if (!isDuplicate) dedupedIndices.push(index);
+    });
+
+    // Step 3: Proximity filter — only show people near at least one other person
+    // If only 1-2 people total, show all (they might be fighting)
+    let filteredIndices: number[];
+    if (dedupedIndices.length <= 2) {
+      filteredIndices = dedupedIndices;
+    } else {
+      filteredIndices = dedupedIndices.filter(i => {
+        const center = skeletonCenters[i];
+        return dedupedIndices.some(j => {
+          if (i === j) return false;
+          const other = skeletonCenters[j];
+          return Math.sqrt((center.x - other.x) ** 2 + (center.y - other.y) ** 2) < PROXIMITY_THRESHOLD;
+        });
+      });
+      // If proximity filter removed everyone (all spread out), show closest pair
+      if (filteredIndices.length === 0) filteredIndices = dedupedIndices.slice(0, 2);
+    }
+
+    // Step 4: Cap at MAX_SKELETONS
+    const finalIndices = filteredIndices.slice(0, MAX_SKELETONS);
+    const dedupedSkeletons = finalIndices.map(i => skeletons[i]);
 
     // IMPORTANT: Server coordinates are in the SENT frame size
     // Must match the capture resolution (screen share uses higher res)
