@@ -407,13 +407,6 @@ export default function LivePage() {
   const prevKeypointsRef = useRef<Map<number, { x: number; y: number; timestamp: number }[]>>(new Map());
   const velocityHistoryRef = useRef<number[]>([]);  // Rolling average of velocities
 
-  // Skeleton interpolation: smooth 60fps rendering from ~10fps server updates
-  const skeletonStateRef = useRef<{
-    prev: { skeletons: number[][][]; trackIds: number[]; time: number } | null;
-    current: { skeletons: number[][][]; trackIds: number[]; time: number } | null;
-  }>({ prev: null, current: null });
-  const skeletonAnimFrameRef = useRef<number | null>(null);
-
   // Recording refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -843,12 +836,10 @@ export default function LivePage() {
                   if (ctx) ctx.clearRect(0, 0, overlay.width, overlay.height);
                 }
               } else if (data.skeletons && data.skeletons.length > 0) {
-                // Draw skeletons client-side with interpolation for smooth 60fps
+                // Draw skeletons directly - frame by frame, no interpolation
                 clearProcessedFrame();
-                updateSkeletonData(data.skeletons, data.track_ids || []);
+                drawServerSkeletons(data.skeletons);
               } else {
-                // No skeleton data - stop interpolation and clear
-                skeletonStateRef.current = { prev: null, current: null };
                 clearProcessedFrame();
                 const overlay = overlayCanvasRef.current;
                 if (overlay) {
@@ -889,9 +880,8 @@ export default function LivePage() {
                 clearProcessedFrame();
                 const skeletons = data.all_skeletons || data.skeletons || [];
                 if (skeletons.length > 0) {
-                  updateSkeletonData(skeletons, data.track_ids || []);
+                  drawServerSkeletons(skeletons);
                 } else {
-                  skeletonStateRef.current = { prev: null, current: null };
                   const overlay = overlayCanvasRef.current;
                   if (overlay) {
                     const ctx = overlay.getContext('2d');
@@ -915,12 +905,6 @@ export default function LivePage() {
         };
 
         ws.onclose = () => {
-          // Reset skeleton interpolation on disconnect
-          skeletonStateRef.current = { prev: null, current: null };
-          if (skeletonAnimFrameRef.current) {
-            cancelAnimationFrame(skeletonAnimFrameRef.current);
-            skeletonAnimFrameRef.current = null;
-          }
           // Use ref to avoid stale closure - isActiveRef is always current
           if (isActiveRef.current) {
             setTimeout(() => connectWebSocket(), 2000);
@@ -1469,84 +1453,6 @@ export default function LivePage() {
       if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
     setShowProcessedFrame(false);  // Show raw video again
-  };
-
-  // Skeleton interpolation: lerp between server frames for smooth 60fps rendering
-  const interpolateSkeletons = (
-    prevSkeletons: number[][][], prevTrackIds: number[],
-    currSkeletons: number[][][], currTrackIds: number[],
-    t: number
-  ): number[][][] => {
-    return currSkeletons.map((currSkel, idx) => {
-      // Match skeletons between frames using track IDs for accuracy
-      let prevSkel: number[][] | undefined;
-      if (currTrackIds.length > idx && prevTrackIds.length > 0) {
-        const trackId = currTrackIds[idx];
-        const prevIdx = prevTrackIds.indexOf(trackId);
-        prevSkel = prevIdx >= 0 ? prevSkeletons[prevIdx] : undefined;
-      } else if (idx < prevSkeletons.length) {
-        prevSkel = prevSkeletons[idx];
-      }
-      if (!prevSkel) return currSkel;
-
-      return currSkel.map((kp, kpIdx) => {
-        const prevKp = prevSkel![kpIdx];
-        if (!prevKp || !kp || kp.length < 3 || prevKp.length < 3) return kp;
-        if (kp[2] < 0.3 || prevKp[2] < 0.3) return kp;
-        return [
-          prevKp[0] + (kp[0] - prevKp[0]) * t,
-          prevKp[1] + (kp[1] - prevKp[1]) * t,
-          kp[2],
-        ];
-      });
-    });
-  };
-
-  // Update skeleton state from server data (called from WS handler)
-  const updateSkeletonData = (skeletons: number[][][], trackIds: number[]) => {
-    const now = performance.now();
-    skeletonStateRef.current.prev = skeletonStateRef.current.current;
-    skeletonStateRef.current.current = { skeletons, trackIds, time: now };
-    // Start animation loop if not running
-    if (!skeletonAnimFrameRef.current) {
-      skeletonAnimFrameRef.current = requestAnimationFrame(renderSkeletonFrame);
-    }
-  };
-
-  // 60fps skeleton rendering loop with interpolation
-  const renderSkeletonFrame = () => {
-    const state = skeletonStateRef.current;
-    if (!state.current) {
-      skeletonAnimFrameRef.current = null;
-      return;
-    }
-    const now = performance.now();
-    const age = now - state.current.time;
-
-    // Stop if data is stale (no new frames for 500ms)
-    if (age > 500) {
-      skeletonAnimFrameRef.current = null;
-      return;
-    }
-
-    if (state.prev) {
-      const frameDelta = state.current.time - state.prev.time;
-      if (frameDelta > 10) { // Guard against zero/tiny deltas
-        // t=1 at the moment current arrived, increases for extrapolation
-        const t = Math.min(1 + age / frameDelta, 1.35);
-        const interpolated = interpolateSkeletons(
-          state.prev.skeletons, state.prev.trackIds,
-          state.current.skeletons, state.current.trackIds,
-          t
-        );
-        drawServerSkeletons(interpolated);
-      } else {
-        drawServerSkeletons(state.current.skeletons);
-      }
-    } else {
-      drawServerSkeletons(state.current.skeletons);
-    }
-    skeletonAnimFrameRef.current = requestAnimationFrame(renderSkeletonFrame);
   };
 
   // Draw YOLO v26 skeletons from server response (COCO 17-keypoint format)
@@ -2137,13 +2043,6 @@ export default function LivePage() {
       cancelAnimationFrame(animationRef.current);
       animationRef.current = null;
     }
-
-    // Stop skeleton interpolation loop
-    if (skeletonAnimFrameRef.current) {
-      cancelAnimationFrame(skeletonAnimFrameRef.current);
-      skeletonAnimFrameRef.current = null;
-    }
-    skeletonStateRef.current = { prev: null, current: null };
 
     if (fightAlertTimeoutRef.current) {
       clearTimeout(fightAlertTimeoutRef.current);
