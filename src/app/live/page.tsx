@@ -1333,22 +1333,53 @@ export default function LivePage() {
   }, [isActive, detectionMode]);
 
   // Draw poses on overlay canvas
+  // FIX: Use same letterbox-aware coordinate transformation as drawServerSkeletons
+  // MoveNet returns keypoints in video native coordinates, but the video uses object-contain
+  // which letterboxes the content. The overlay canvas must account for this offset.
   const drawPoses = (poses: DetectedPose[]) => {
     const overlay = overlayCanvasRef.current;
-    if (!overlay) return;
+    const video = videoRef.current;
+    if (!overlay || !video) return;
 
     const ctx = overlay.getContext('2d');
-    if (!ctx || !videoRef.current) return;
+    if (!ctx) return;
 
-    // WEBCAM LAG FIX: Only update canvas dimensions when they actually change
-    // Setting canvas.width/height resets the context and is very expensive
-    const targetWidth = videoRef.current.videoWidth;
-    const targetHeight = videoRef.current.videoHeight;
-    if (overlay.width !== targetWidth || overlay.height !== targetHeight) {
-      overlay.width = targetWidth;
-      overlay.height = targetHeight;
+    // Use container (CSS display) dimensions for canvas — same approach as drawServerSkeletons
+    const videoNativeWidth = video.videoWidth || 640;
+    const videoNativeHeight = video.videoHeight || 480;
+    const containerWidth = video.clientWidth || videoNativeWidth;
+    const containerHeight = video.clientHeight || videoNativeHeight;
+
+    if (overlay.width !== containerWidth || overlay.height !== containerHeight) {
+      overlay.width = containerWidth;
+      overlay.height = containerHeight;
     }
-    ctx.clearRect(0, 0, overlay.width, overlay.height);
+    ctx.clearRect(0, 0, containerWidth, containerHeight);
+
+    // Calculate letterbox offset (object-contain) — same as drawServerSkeletons
+    const videoAspect = videoNativeWidth / videoNativeHeight;
+    const containerAspect = containerWidth / containerHeight;
+
+    let videoDisplayWidth: number;
+    let videoDisplayHeight: number;
+    let offsetX: number;
+    let offsetY: number;
+
+    if (videoAspect > containerAspect) {
+      videoDisplayWidth = containerWidth;
+      videoDisplayHeight = containerWidth / videoAspect;
+      offsetX = 0;
+      offsetY = (containerHeight - videoDisplayHeight) / 2;
+    } else {
+      videoDisplayHeight = containerHeight;
+      videoDisplayWidth = containerHeight * videoAspect;
+      offsetX = (containerWidth - videoDisplayWidth) / 2;
+      offsetY = 0;
+    }
+
+    // Scale from native video coordinates to display area
+    const scaleX = videoDisplayWidth / videoNativeWidth;
+    const scaleY = videoDisplayHeight / videoNativeHeight;
 
     const connections = [
       [0, 1], [0, 2], [1, 3], [2, 4],
@@ -1368,8 +1399,8 @@ export default function LivePage() {
         const kp2 = pose.keypoints[j];
         if (kp1?.score > 0.3 && kp2?.score > 0.3) {
           ctx.beginPath();
-          ctx.moveTo(kp1.x, kp1.y);
-          ctx.lineTo(kp2.x, kp2.y);
+          ctx.moveTo(kp1.x * scaleX + offsetX, kp1.y * scaleY + offsetY);
+          ctx.lineTo(kp2.x * scaleX + offsetX, kp2.y * scaleY + offsetY);
           ctx.stroke();
         }
       });
@@ -1378,7 +1409,7 @@ export default function LivePage() {
         if (kp.score > 0.3) {
           ctx.fillStyle = currentViolence > 70 ? '#ef4444' : '#22c55e';
           ctx.beginPath();
-          ctx.arc(kp.x, kp.y, 5, 0, 2 * Math.PI);
+          ctx.arc(kp.x * scaleX + offsetX, kp.y * scaleY + offsetY, 5, 0, 2 * Math.PI);
           ctx.fill();
         }
       });
