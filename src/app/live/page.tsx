@@ -396,6 +396,7 @@ export default function LivePage() {
   const startTimeRef = useRef<number>(0);
   const _frameBufferRef = useRef<string[]>([]); // Reserved for future buffering
   const violenceHitsRef = useRef<number>(0);
+  const lastViolenceTimeRef = useRef<number>(0); // Time of last VIOLENCE frame
   const sustainedViolenceRef = useRef<number>(0);
   const lastAlertTimeRef = useRef<number>(0); // Cooldown: prevent alert spam
   const fightAlertTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -973,43 +974,40 @@ export default function LivePage() {
 
     // CRITICAL: Skip fight detection entirely if VETOED
     if (isVetoed) {
-      // Reset violence counters when vetoed - this was a false positive
-      violenceHitsRef.current = Math.max(0, violenceHitsRef.current - 1);
-      sustainedViolenceRef.current = Math.max(0, sustainedViolenceRef.current - 10);
-      return; // Don't trigger any alerts
+      // Veto model actively disagreed - don't decrement counter though,
+      // as fights have fluctuating scores and vetoes can be intermittent
+      return;
     }
 
-    // SERVER CONFIRMED VIOLENCE - require sustained confirmation to avoid false positives
-    // Require 3+ consecutive VIOLENCE frames AND a 15-second cooldown between alerts
-    // Person count check on server prevents 1-person false positives
+    // SERVER CONFIRMED VIOLENCE - time-window accumulation (not consecutive)
+    // Server already validates: dual-model agreement + 2+ people present
     if (isConfirmedViolence) {
-      violenceHitsRef.current++;
       const now = Date.now();
-      const cooldownMs = 15000; // 15 seconds between alerts
+      // Reset counter if no violence for 3+ seconds (fight likely ended)
+      if (lastViolenceTimeRef.current > 0 && (now - lastViolenceTimeRef.current > 3000)) {
+        violenceHitsRef.current = 0;
+      }
+      lastViolenceTimeRef.current = now;
+      violenceHitsRef.current++;
+      const cooldownMs = 8000; // 8 seconds between alerts
       const timeSinceLastAlert = now - lastAlertTimeRef.current;
-      if (violenceHitsRef.current >= 3 && timeSinceLastAlert >= cooldownMs) {
+      // Trigger after 2 server-confirmed VIOLENCE frames within the time window
+      if (violenceHitsRef.current >= 2 && timeSinceLastAlert >= cooldownMs) {
         triggerFightAlert(violence);
-        violenceHitsRef.current = 0; // Reset after triggering
+        violenceHitsRef.current = 0;
         lastAlertTimeRef.current = now;
       }
       return;
     }
 
-    // CLIENT-SIDE THRESHOLD TRIGGERS
-    // In server mode: Skip client-side triggers when server says SAFE - trust the Smart Veto
-    // In browser mode (data.result === undefined): Use client-side thresholds for detection
-    // This prevents false positives where server says SAFE but client triggers on lower thresholds
+    // Server says SAFE - don't touch violence counter (time-based decay handles reset)
     if (data.result === 'SAFE') {
-      // Server's Smart Veto evaluated both models and determined this is SAFE
-      // Reset counters to prevent stale buildup from prior frames
-      violenceHitsRef.current = Math.max(0, violenceHitsRef.current - 1);
-      sustainedViolenceRef.current = Math.max(0, sustainedViolenceRef.current - 10);
       return;
     }
 
     // Browser mode only (no server result) - use client-side thresholds
     const now = Date.now();
-    const cooldownMs = 15000; // 15 seconds between alerts
+    const cooldownMs = 8000; // 8 seconds between alerts
     const timeSinceLastAlert = now - lastAlertTimeRef.current;
 
     // Instant trigger: N× frames at X%+
