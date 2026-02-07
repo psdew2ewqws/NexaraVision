@@ -426,7 +426,7 @@ export default function LivePage() {
   const lastIncidentTimeRef = useRef<number>(0);
   const lastFrameSentTimeRef = useRef<number>(0);  // For frame rate throttling
   const _lastWsWarningRef = useRef<number>(0);  // Reserved for future WS warning throttling
-  const TARGET_FPS = 10;  // 10 FPS = 100ms interval (reduced for smoother UI)
+  const TARGET_FPS = 30;  // 30 FPS for smooth skeleton tracking
   const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
 
   // Format duration
@@ -980,15 +980,14 @@ export default function LivePage() {
     }
 
     // SERVER CONFIRMED VIOLENCE - require sustained confirmation to avoid false positives
-    // Even with Smart Veto, brief spikes (arm swings, overlapping skeletons) can trigger both models
-    // Require 5+ consecutive VIOLENCE frames AND a 15-second cooldown between alerts
+    // Require 3+ consecutive VIOLENCE frames AND a 15-second cooldown between alerts
+    // Person count check on server prevents 1-person false positives
     if (isConfirmedViolence) {
       violenceHitsRef.current++;
       const now = Date.now();
       const cooldownMs = 15000; // 15 seconds between alerts
       const timeSinceLastAlert = now - lastAlertTimeRef.current;
-      // Require 5 confirmed VIOLENCE frames AND cooldown elapsed
-      if (violenceHitsRef.current >= 5 && timeSinceLastAlert >= cooldownMs) {
+      if (violenceHitsRef.current >= 3 && timeSinceLastAlert >= cooldownMs) {
         triggerFightAlert(violence);
         violenceHitsRef.current = 0; // Reset after triggering
         lastAlertTimeRef.current = now;
