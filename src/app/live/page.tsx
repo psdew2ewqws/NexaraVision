@@ -420,7 +420,7 @@ export default function LivePage() {
   const lastIncidentTimeRef = useRef<number>(0);
   const lastFrameSentTimeRef = useRef<number>(0);  // For frame rate throttling
   const _lastWsWarningRef = useRef<number>(0);  // Reserved for future WS warning throttling
-  const TARGET_FPS = 30;  // 30 FPS for smooth skeleton tracking
+  const TARGET_FPS = 16;  // 16 FPS - balanced: fast enough for tracking, slow enough for server to keep up
   const FRAME_INTERVAL_MS = 1000 / TARGET_FPS;
 
   // Format duration
@@ -1325,7 +1325,7 @@ export default function LivePage() {
             wsRef.current.send(blob);
           }
         }
-      }, 'image/jpeg', 0.5);  // 0.5 quality for even faster transmission
+      }, 'image/jpeg', 0.7);  // 0.7 quality - better YOLO pose accuracy (especially screen share)
     }
 
     animationRef.current = requestAnimationFrame(runDetectionLoop);
