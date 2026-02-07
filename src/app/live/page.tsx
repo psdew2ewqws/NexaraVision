@@ -1252,9 +1252,10 @@ export default function LivePage() {
       return;
     }
 
-    // Constrain canvas size for performance (GAP-015 fix)
-    const MAX_WIDTH = 640;  // Reduced for faster processing
-    const MAX_HEIGHT = 480;
+    // Constrain canvas size - larger for screen share (better YOLO accuracy on distant subjects)
+    const isScreenShare = source === 'screen';
+    const MAX_WIDTH = isScreenShare ? 960 : 640;
+    const MAX_HEIGHT = isScreenShare ? 720 : 480;
     let canvasWidth = video.videoWidth;
     let canvasHeight = video.videoHeight;
 
@@ -1509,10 +1510,11 @@ export default function LivePage() {
       return true; // Keep this skeleton
     });
 
-    // IMPORTANT: Server coordinates are in the SENT frame size (max 640x480)
-    // NOT in video.videoWidth/videoHeight!
-    const SENT_MAX_WIDTH = 640;
-    const SENT_MAX_HEIGHT = 480;
+    // IMPORTANT: Server coordinates are in the SENT frame size
+    // Must match the capture resolution (screen share uses higher res)
+    const isScreenSrc = source === 'screen';
+    const SENT_MAX_WIDTH = isScreenSrc ? 960 : 640;
+    const SENT_MAX_HEIGHT = isScreenSrc ? 720 : 480;
 
     // Calculate the actual sent frame dimensions (same logic as frame capture)
     const videoNativeWidth = video.videoWidth || 640;
