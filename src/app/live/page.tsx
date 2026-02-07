@@ -54,6 +54,7 @@ import {
 import { useDetectionSettings } from '@/hooks/useDetectionSettings';
 import { useAlertSettings } from '@/hooks/useAlertSettings';
 import { useAuth } from '@/contexts/AuthContext';
+import { useAlertContext } from '@/contexts/AlertContext';
 import { useModelConfiguration } from '@/hooks/useModelConfiguration';
 import { createLogger, wsLogger, incidentLogger, alertLogger } from '@/lib/logger';
 
@@ -363,6 +364,7 @@ export default function LivePage() {
 
   // Auth context for user ID
   const { user } = useAuth();
+  const { pushAlert } = useAlertContext();
 
   // Alert settings for WhatsApp notifications
   const { settings: alertSettings } = useAlertSettings(user?.id);
@@ -376,11 +378,12 @@ export default function LivePage() {
   const activeCameraRef = useRef<CameraRecord | null>(null);
   const defaultLocationRef = useRef<Location | null>(null);
 
-  // Refs for alertSettings, user, modelConfig, and detectionSettings to avoid stale closures in WebSocket callbacks
+  // Refs for alertSettings, user, modelConfig, detectionSettings, and pushAlert to avoid stale closures in WebSocket callbacks
   const alertSettingsRef = useRef(alertSettings);
   const userRef = useRef(user);
   const modelConfigRef = useRef(modelConfig);
   const detectionSettingsRef = useRef(detectionSettings);
+  const pushAlertRef = useRef(pushAlert);
 
   // Refs
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -1021,12 +1024,23 @@ export default function LivePage() {
     setAlerts((prev) => [...prev, { time: new Date(), confidence }]);
     setStats((prev) => ({ ...prev, fightCount: prev.fightCount + 1 }));
 
-    // IMMEDIATE: Send WhatsApp alert FIRST (don't wait for DB)
     // USE REFS to avoid stale closure in WebSocket callback
-    const currentAlertSettings = alertSettingsRef.current;
-    const currentUser = userRef.current;
     let camera = activeCameraRef.current;
     let location = defaultLocationRef.current;
+
+    // IMMEDIATE: Push global real-time notification (bypasses Supabase Realtime for instant delivery)
+    pushAlertRef.current({
+      camera: camera?.name || 'Browser Camera',
+      location: location?.name || 'Unknown Location',
+      confidence: Math.round(confidence),
+      timestamp: new Date(),
+      status: 'detected',
+      incident_id: currentIncidentIdRef.current || 'pending',
+    });
+
+    // IMMEDIATE: Send WhatsApp alert (don't wait for DB)
+    const currentAlertSettings = alertSettingsRef.current;
+    const currentUser = userRef.current;
 
     if (currentAlertSettings?.whatsapp_enabled && currentAlertSettings?.whatsapp_number && currentUser?.id) {
       alertLogger.debug('[WhatsApp] Sending violence alert to:', currentAlertSettings.whatsapp_number);
@@ -2077,6 +2091,10 @@ export default function LivePage() {
   useEffect(() => {
     userRef.current = user;
   }, [user]);
+
+  useEffect(() => {
+    pushAlertRef.current = pushAlert;
+  }, [pushAlert]);
 
   // Sync modelConfigRef to avoid stale closures in WebSocket callbacks
   // Also send updated config to server for live sessions

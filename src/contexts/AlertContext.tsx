@@ -45,6 +45,7 @@ interface AlertContextType {
   dismissAlert: (id: string) => void;
   acknowledgeAlert: (id: string) => Promise<void>;
   clearAllAlerts: () => void;
+  pushAlert: (alert: Omit<AlertData, 'id'>) => void;
   latestIncident: IncidentPayload | null;
   realtimeStatus: 'connecting' | 'connected' | 'disconnected' | 'error';
   triggerTestAlert: () => Promise<void>;
@@ -204,6 +205,17 @@ export function AlertProvider({ children }: { children: ReactNode }) {
     setAlerts([]);
   }, []);
 
+  // Push alert directly (from live page — bypasses Supabase Realtime for instant delivery)
+  const pushAlert = useCallback((alert: Omit<AlertData, 'id'>) => {
+    const newAlert: AlertData = {
+      ...alert,
+      id: `alert-direct-${Date.now()}`,
+    };
+    setAlerts(prev => [newAlert, ...prev].slice(0, MAX_ALERTS));
+    playAlertSound();
+    log.debug('[AlertContext] ✅ Direct alert pushed:', newAlert.id);
+  }, []);
+
   // Helper function to process an incident into an alert
   const processIncidentToAlert = useCallback(async (incident: IncidentPayload): Promise<AlertData> => {
     // Fetch related camera and location data
@@ -337,10 +349,24 @@ export function AlertProvider({ children }: { children: ReactNode }) {
             log.debug('[AlertContext] 🚨 NEW INCIDENT DETECTED via Realtime:', payload.new);
 
             const incident = payload.new as IncidentPayload;
+
+            // Skip if we already have a direct-push alert for this incident (avoid duplicates)
+            setAlerts(prev => {
+              const alreadyExists = prev.some(a => a.incident_id === incident.id);
+              if (alreadyExists) {
+                log.debug('[AlertContext] Skipping duplicate - already pushed directly for:', incident.id);
+                return prev;
+              }
+              return prev; // Will be updated below
+            });
+
             const newAlert = await processIncidentToAlert(incident);
 
-            // Add to alerts list (keep max alerts)
-            setAlerts(prev => [newAlert, ...prev].slice(0, MAX_ALERTS));
+            // Add to alerts list (skip if direct push already added it)
+            setAlerts(prev => {
+              if (prev.some(a => a.incident_id === incident.id)) return prev;
+              return [newAlert, ...prev].slice(0, MAX_ALERTS);
+            });
             setLatestIncident(incident);
 
             // Play alert sound
@@ -410,6 +436,7 @@ export function AlertProvider({ children }: { children: ReactNode }) {
         dismissAlert,
         acknowledgeAlert,
         clearAllAlerts,
+        pushAlert,
         latestIncident,
         realtimeStatus,
         triggerTestAlert,
