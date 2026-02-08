@@ -638,9 +638,21 @@ export default function LivePage() {
     }
 
     try {
-      // Create peer connection with STUN server for NAT traversal
+      // Create peer connection with STUN + TURN servers for NAT traversal
       const pc = new RTCPeerConnection({
-        iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' },
+          {
+            urls: [
+              'turn:a.relay.metered.ca:80',
+              'turn:a.relay.metered.ca:443',
+              'turn:a.relay.metered.ca:443?transport=tcp',
+            ],
+            username: '83eebfcdfc4fff89c9274296',
+            credential: '2D7JvfkOQtBdYW3R',
+          },
+        ],
       });
       pcRef.current = pc;
 
