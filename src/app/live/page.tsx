@@ -649,8 +649,8 @@ export default function LivePage() {
               'turn:a.relay.metered.ca:443',
               'turn:a.relay.metered.ca:443?transport=tcp',
             ],
-            username: '83eebfcdfc4fff89c9274296',
-            credential: '2D7JvfkOQtBdYW3R',
+            username: 'a58911933fdda4c166d7a392',
+            credential: '8eD4qkgnS2Vn833C',
           },
         ],
       });
