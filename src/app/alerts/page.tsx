@@ -408,6 +408,16 @@ export default function AlertsPage() {
                           {t.actions.resolve}
                         </button>
                       )}
+
+                      {incident.status !== 'resolved' && incident.status !== 'false_positive' && (
+                        <button
+                          onClick={() => handleStatusUpdate(incident.id, 'false_positive')}
+                          disabled={updatingId === incident.id}
+                          className="flex items-center gap-1.5 px-3 py-2.5 min-h-[44px] bg-slate-600/20 hover:bg-slate-600/30 active:bg-slate-600/40 text-slate-400 text-xs sm:text-sm rounded-lg transition-colors disabled:opacity-50 active:scale-95"
+                        >
+                          {t.actions.markFalse}
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
